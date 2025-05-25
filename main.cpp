@@ -3,17 +3,49 @@
 #include <vector>
 #include <memory>
 #include <algorithm>
-#include <algorithm>
 #include <windows.h>
+#include <unordered_set>
 
 using namespace std;
 
-// Предварительное объявление классов
+// Предварительные объявления
+class Person;
 class Relationship;
-class FamilyEvent;
+
+// Базовый класс наблюдателя
+class IObserver {
+public:
+    virtual ~IObserver() = default;
+    virtual void onPersonChanged(const Person& person, const string& changeType) = 0;
+    virtual void onRelationshipChanged(const Relationship& rel, 
+                                     const shared_ptr<Person>& p1, 
+                                     const shared_ptr<Person>& p2, 
+                                     const string& changeType) = 0;
+};
+
+// Базовый класс наблюдаемого объекта
+class Observable {
+protected:
+    unordered_set<shared_ptr<IObserver>> observers;
+
+public:
+    void addObserver(const shared_ptr<IObserver>& observer) {
+        observers.insert(observer);
+    }
+
+    void removeObserver(const shared_ptr<IObserver>& observer) {
+        observers.erase(observer);
+    }
+
+    void notifyPersonChanged(const Person& person, const string& changeType);
+    void notifyRelationshipChanged(const Relationship& rel, 
+                                 const shared_ptr<Person>& p1, 
+                                 const shared_ptr<Person>& p2, 
+                                 const string& changeType);
+};
 
 // Класс человека
-class Person {
+class Person : public Observable {
 private:
     string firstName;
     string lastName;
@@ -22,14 +54,13 @@ private:
     string birthPlace;
     string deathPlace;
     string occupation;
-    bool isAlive;
+    bool alive;
 
 public:
     Person(string fName, string lName, string mName, string gender,
         string bPlace, string occupation)
         : firstName(fName), lastName(lName), middleName(mName), gender(gender),
-        birthPlace(bPlace), deathPlace(""), occupation(occupation), isAlive(true) {
-    }
+        birthPlace(bPlace), deathPlace(""), occupation(occupation), alive(true) {}
 
     // Геттеры
     string getFullName() const { return lastName + " " + firstName + " " + middleName; }
@@ -37,28 +68,45 @@ public:
     string getBirthPlace() const { return birthPlace; }
     string getDeathPlace() const { return deathPlace; }
     string getOccupation() const { return occupation; }
-    bool isAlive() const { return isAlive; }
+    bool isAlive() const { return alive; }
 
     // Сеттеры
     void setDeath(string place) {
         deathPlace = place;
-        isAlive = false;
+        alive = false;
+        notifyPersonChanged(*this, "death");
     }
 
     void printInfo() const {
         cout << "ФИО: " << getFullName() << endl;
         cout << "Пол: " << gender << endl;
         cout << "Место рождения: " << birthPlace << endl;
-        if (!isAlive) {
+        if (!alive) {
             cout << "Место смерти: " << deathPlace << endl;
         }
         cout << "Профессия: " << occupation << endl;
-        cout << "Статус: " << (isAlive ? "Жив" : "Умер") << endl;
+        cout << "Статус: " << (alive ? "Жив" : "Умер") << endl;
     }
 };
 
+// Реализация методов Observable после определения Person и Relationship
+void Observable::notifyPersonChanged(const Person& person, const string& changeType) {
+    for (const auto& observer : observers) {
+        observer->onPersonChanged(person, changeType);
+    }
+}
+
+void Observable::notifyRelationshipChanged(const Relationship& rel, 
+                                         const shared_ptr<Person>& p1, 
+                                         const shared_ptr<Person>& p2, 
+                                         const string& changeType) {
+    for (const auto& observer : observers) {
+        observer->onRelationshipChanged(rel, p1, p2, changeType);
+    }
+}
+
 // Класс отношений
-class Relationship {
+class Relationship : public Observable {
 private:
     vector<tuple<shared_ptr<Person>, shared_ptr<Person>, string>> relationships;
 
@@ -66,14 +114,16 @@ public:
     // Добавление отношения
     void addRelationship(shared_ptr<Person> person1, shared_ptr<Person> person2, string relationType) {
         relationships.emplace_back(person1, person2, relationType);
+        notifyRelationshipChanged(*this, person1, person2, "add:" + relationType);
 
-        // Автоматически добавляем обратное отношение для родитель-ребенок
+        // Автоматически добавляем обратное отношение
         if (relationType == "parent-child") {
             relationships.emplace_back(person2, person1, "child-parent");
+            notifyRelationshipChanged(*this, person2, person1, "add:child-parent");
         }
-        // Автоматически добавляем братские отношения, если у людей общий родитель
         else if (relationType == "sibling") {
             relationships.emplace_back(person2, person1, "sibling");
+            notifyRelationshipChanged(*this, person2, person1, "add:sibling");
         }
     }
 
@@ -85,14 +135,7 @@ public:
                     return get<0>(rel) == person1 && get<1>(rel) == person2 && get<2>(rel) == relationType;
                 }),
             relationships.end());
-    }
-
-    // Проверка наличия отношения
-    bool hasRelationship(shared_ptr<Person> person1, shared_ptr<Person> person2, string relationType) const {
-        return any_of(relationships.begin(), relationships.end(),
-            [&](const auto& rel) {
-                return get<0>(rel) == person1 && get<1>(rel) == person2 && get<2>(rel) == relationType;
-            });
+        notifyRelationshipChanged(*this, person1, person2, "remove:" + relationType);
     }
 
     // Получение всех отношений для человека
@@ -126,10 +169,11 @@ private:
     shared_ptr<Person> child;
 
 public:
-    BirthEvent(shared_ptr<Relationship> relSystem, shared_ptr<Person> mother,
-        shared_ptr<Person> father, shared_ptr<Person> child)
-        : FamilyEvent(relSystem), mother(mother), father(father), child(child) {
-    }
+    BirthEvent(shared_ptr<Relationship> relSystem, 
+              shared_ptr<Person> mother, 
+              shared_ptr<Person> father, 
+              shared_ptr<Person> child)
+        : FamilyEvent(relSystem), mother(mother), father(father), child(child) {}
 
     void execute() override {
         // Добавляем отношения родитель-ребенок
@@ -145,75 +189,47 @@ public:
         }
 
         cout << "Родился новый член семьи: " << child->getFullName() << endl;
+        child->notifyPersonChanged(*child, "birth");
     }
 };
 
-// Класс события смерти
-class DeathEvent : public FamilyEvent {
-private:
-    shared_ptr<Person> person;
-    string deathPlace;
-
+// Класс наблюдателя для логирования
+class LoggerObserver : public IObserver {
 public:
-    DeathEvent(shared_ptr<Relationship> relSystem, shared_ptr<Person> person, string dPlace)
-        : FamilyEvent(relSystem), person(person), deathPlace(dPlace) {
+    void onPersonChanged(const Person& person, const string& changeType) override {
+        cout << "[Лог] Изменение в Person: " << person.getFullName() 
+             << ", тип изменения: " << changeType << endl;
     }
 
-    void execute() override {
-        person->setDeath(deathPlace);
-        cout << "Член семьи " << person->getFullName() << " умер в " << deathPlace << endl;
-    }
-};
-
-// Класс события развода
-class DivorceEvent : public FamilyEvent {
-private:
-    shared_ptr<Person> spouse1;
-    shared_ptr<Person> spouse2;
-
-public:
-    DivorceEvent(shared_ptr<Relationship> relSystem, shared_ptr<Person> spouse1, shared_ptr<Person> spouse2)
-        : FamilyEvent(relSystem), spouse1(spouse1), spouse2(spouse2) {
-    }
-
-    void execute() override {
-        relationshipSystem->removeRelationship(spouse1, spouse2, "spouse");
-        relationshipSystem->removeRelationship(spouse2, spouse1, "spouse");
-
-        cout << spouse1->getFullName() << " и " << spouse2->getFullName() << " развелись" << endl;
+    void onRelationshipChanged(const Relationship& rel, 
+                             const shared_ptr<Person>& p1, 
+                             const shared_ptr<Person>& p2, 
+                             const string& changeType) override {
+        cout << "[Лог] Изменение в Relationship: " 
+             << p1->getFullName() << " -> " << p2->getFullName()
+             << ", тип изменения: " << changeType << endl;
     }
 };
-
-// Класс события свадьбы
-class MarriageEvent : public FamilyEvent {
-private:
-    shared_ptr<Person> spouse1;
-    shared_ptr<Person> spouse2;
-
-public:
-    MarriageEvent(shared_ptr<Relationship> relSystem, shared_ptr<Person> spouse1, shared_ptr<Person> spouse2)
-        : FamilyEvent(relSystem), spouse1(spouse1), spouse2(spouse2) {
-    }
-
-    void execute() override {
-        relationshipSystem->addRelationship(spouse1, spouse2, "spouse");
-        relationshipSystem->addRelationship(spouse2, spouse1, "spouse");
-
-        cout << spouse1->getFullName() << " и " << spouse2->getFullName() << " поженились" << endl;
-    }
-};
-
 
 int main() {
     SetConsoleOutputCP(1251); // Настраиваем консоль для русского текста
 
+    // Создаем наблюдателя
+    auto logger = make_shared<LoggerObserver>();
+
     // Создаем систему отношений
     auto relationshipSystem = make_shared<Relationship>();
+    relationshipSystem->addObserver(logger);
 
-    // Создаем людей
+    // Создаем людей и подписываем на наблюдателя
     auto ivan = make_shared<Person>("Иван", "Иванов", "Иванович", "мужской", "Москва", "Инженер");
+    ivan->addObserver(logger);
+    
     auto maria = make_shared<Person>("Мария", "Иванова", "Петровна", "женский", "Санкт-Петербург", "Учитель");
+    maria->addObserver(logger);
+    
     auto petr = make_shared<Person>("Петр", "Иванов", "Иванович", "мужской", "Москва", "Студент");
+    petr->addObserver(logger);
 
     // Выводим информацию о людях
     cout << "=== Информация о людях ===" << endl;
@@ -222,10 +238,10 @@ int main() {
     maria->printInfo();
     cout << endl;
 
-    // Событие свадьбыvvv
+    // Событие свадьбы
     cout << "\n=== Событие: Свадьба ===" << endl;
-    MarriageEvent wedding(relationshipSystem, ivan, maria);
-    wedding.execute();
+    relationshipSystem->addRelationship(ivan, maria, "spouse");
+    relationshipSystem->addRelationship(maria, ivan, "spouse");
 
     // Событие рождения ребенка
     cout << "\n=== Событие: Рождение ребенка ===" << endl;
@@ -236,11 +252,8 @@ int main() {
 
     // Событие смерти
     cout << "\n=== Событие: Смерть ===" << endl;
-    DeathEvent death(relationshipSystem, ivan, "Сочи");
-    death.execute();
+    ivan->setDeath("Сочи");
     ivan->printInfo();
 
     return 0;
-
-
 }
