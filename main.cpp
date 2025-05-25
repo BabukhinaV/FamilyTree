@@ -17,10 +17,10 @@ class IObserver {
 public:
     virtual ~IObserver() = default;
     virtual void onPersonChanged(const Person& person, const string& changeType) = 0;
-    virtual void onRelationshipChanged(const Relationship& rel, 
-                                     const shared_ptr<Person>& p1, 
-                                     const shared_ptr<Person>& p2, 
-                                     const string& changeType) = 0;
+    virtual void onRelationshipChanged(const Relationship& rel,
+        const shared_ptr<Person>& p1,
+        const shared_ptr<Person>& p2,
+        const string& changeType) = 0;
 };
 
 // Базовый класс наблюдаемого объекта
@@ -38,10 +38,10 @@ public:
     }
 
     void notifyPersonChanged(const Person& person, const string& changeType);
-    void notifyRelationshipChanged(const Relationship& rel, 
-                                 const shared_ptr<Person>& p1, 
-                                 const shared_ptr<Person>& p2, 
-                                 const string& changeType);
+    void notifyRelationshipChanged(const Relationship& rel,
+        const shared_ptr<Person>& p1,
+        const shared_ptr<Person>& p2,
+        const string& changeType);
 };
 
 // Класс человека
@@ -60,10 +60,14 @@ public:
     Person(string fName, string lName, string mName, string gender,
         string bPlace, string occupation)
         : firstName(fName), lastName(lName), middleName(mName), gender(gender),
-        birthPlace(bPlace), deathPlace(""), occupation(occupation), alive(true) {}
+        birthPlace(bPlace), deathPlace(""), occupation(occupation), alive(true) {
+    }
 
     // Геттеры
     string getFullName() const { return lastName + " " + firstName + " " + middleName; }
+    string getFirstName() const { return firstName; }
+    string getLastName() const { return lastName; }
+    string getMiddleName() const { return middleName; }
     string getGender() const { return gender; }
     string getBirthPlace() const { return birthPlace; }
     string getDeathPlace() const { return deathPlace; }
@@ -89,17 +93,17 @@ public:
     }
 };
 
-// Реализация методов Observable после определения Person и Relationship
+// Реализация методов Observable
 void Observable::notifyPersonChanged(const Person& person, const string& changeType) {
     for (const auto& observer : observers) {
         observer->onPersonChanged(person, changeType);
     }
 }
 
-void Observable::notifyRelationshipChanged(const Relationship& rel, 
-                                         const shared_ptr<Person>& p1, 
-                                         const shared_ptr<Person>& p2, 
-                                         const string& changeType) {
+void Observable::notifyRelationshipChanged(const Relationship& rel,
+    const shared_ptr<Person>& p1,
+    const shared_ptr<Person>& p2,
+    const string& changeType) {
     for (const auto& observer : observers) {
         observer->onRelationshipChanged(rel, p1, p2, changeType);
     }
@@ -125,6 +129,10 @@ public:
             relationships.emplace_back(person2, person1, "sibling");
             notifyRelationshipChanged(*this, person2, person1, "add:sibling");
         }
+        else if (relationType == "spouse") {
+            relationships.emplace_back(person2, person1, "spouse");
+            notifyRelationshipChanged(*this, person2, person1, "add:spouse");
+        }
     }
 
     // Удаление отношения
@@ -136,6 +144,17 @@ public:
                 }),
             relationships.end());
         notifyRelationshipChanged(*this, person1, person2, "remove:" + relationType);
+
+        // Удаляем обратное отношение
+        if (relationType == "spouse") {
+            relationships.erase(
+                remove_if(relationships.begin(), relationships.end(),
+                    [&](const auto& rel) {
+                        return get<0>(rel) == person2 && get<1>(rel) == person1 && get<2>(rel) == "spouse";
+                    }),
+                relationships.end());
+            notifyRelationshipChanged(*this, person2, person1, "remove:spouse");
+        }
     }
 
     // Получение всех отношений для человека
@@ -150,18 +169,108 @@ public:
     }
 };
 
-// Абстрактный класс семейного события
-class FamilyEvent {
-protected:
+// Класс генеалогического древа (только хранение и вывод информации)
+class GenealogicalTree {
+private:
+    vector<shared_ptr<Person>> familyMembers;
     shared_ptr<Relationship> relationshipSystem;
 
 public:
-    FamilyEvent(shared_ptr<Relationship> relSystem) : relationshipSystem(relSystem) {}
+    GenealogicalTree() : relationshipSystem(make_shared<Relationship>()) {}
+
+    // Добавление нового члена семьи
+    void addFamilyMember(shared_ptr<Person> person) {
+        familyMembers.push_back(person);
+    }
+
+    // Получение системы отношений
+    shared_ptr<Relationship> getRelationshipSystem() const {
+        return relationshipSystem;
+    }
+
+    // Поиск человека по ФИО
+    shared_ptr<Person> findPerson(const string& fullName) const {
+        for (const auto& person : familyMembers) {
+            if (person->getFullName() == fullName) {
+                return person;
+            }
+        }
+        return nullptr;
+    }
+
+    // Вывод информации о человеке
+    void printPersonInfo(const string& fullName) const {
+        auto person = findPerson(fullName);
+        if (person) {
+            person->printInfo();
+        }
+        else {
+            cout << "Человек с именем " << fullName << " не найден в древе." << endl;
+        }
+    }
+
+    // Вывод всех членов семьи
+    void printAllMembers() const {
+        cout << "=== Все члены семьи ===" << endl;
+        for (const auto& person : familyMembers) {
+            cout << "- " << person->getFullName() << endl;
+        }
+    }
+
+    // Вывод родственных связей для человека
+    void printRelationships(const string& fullName) const {
+        auto person = findPerson(fullName);
+        if (!person) {
+            cout << "Человек не найден." << endl;
+            return;
+        }
+
+        cout << "=== Родственные связи для " << fullName << " ===" << endl;
+        auto relationships = relationshipSystem->getRelationshipsFor(person);
+
+        if (relationships.empty()) {
+            cout << "Связи не найдены." << endl;
+            return;
+        }
+
+        for (const auto& rel : relationships) {
+            string relationType;
+            if (get<1>(rel) == "parent-child") {
+                relationType = "родитель";
+            }
+            else if (get<1>(rel) == "child-parent") {
+                relationType = "ребенок";
+            }
+            else if (get<1>(rel) == "sibling") {
+                relationType = "брат/сестра";
+            }
+            else if (get<1>(rel) == "spouse") {
+                relationType = "супруг(а)";
+            }
+            else if (get<1>(rel) == "ex-spouse") {
+                relationType = "бывший(ая) супруг(а)";
+            }
+            else {
+                relationType = get<1>(rel);
+            }
+
+            cout << "- " << get<0>(rel)->getFullName() << " (" << relationType << ")" << endl;
+        }
+    }
+};
+
+// Базовый класс семейного события
+class FamilyEvent {
+protected:
+    shared_ptr<GenealogicalTree> tree;
+
+public:
+    FamilyEvent(shared_ptr<GenealogicalTree> tree) : tree(tree) {}
     virtual ~FamilyEvent() = default;
     virtual void execute() = 0;
 };
 
-// Класс события рождения
+// Событие рождения
 class BirthEvent : public FamilyEvent {
 private:
     shared_ptr<Person> mother;
@@ -169,27 +278,103 @@ private:
     shared_ptr<Person> child;
 
 public:
-    BirthEvent(shared_ptr<Relationship> relSystem, 
-              shared_ptr<Person> mother, 
-              shared_ptr<Person> father, 
-              shared_ptr<Person> child)
-        : FamilyEvent(relSystem), mother(mother), father(father), child(child) {}
+    BirthEvent(shared_ptr<GenealogicalTree> tree,
+        shared_ptr<Person> mother,
+        shared_ptr<Person> father,
+        const string& fName, const string& lName, const string& mName,
+        const string& gender, const string& bPlace, const string& occupation)
+        : FamilyEvent(tree), mother(mother), father(father),
+        child(make_shared<Person>(fName, lName, mName, gender, bPlace, occupation)) {
+    }
 
     void execute() override {
-        // Добавляем отношения родитель-ребенок
-        relationshipSystem->addRelationship(mother, child, "parent-child");
-        relationshipSystem->addRelationship(father, child, "parent-child");
+        auto relSystem = tree->getRelationshipSystem();
 
-        // Проверяем и добавляем братские отношения
-        auto motherChildren = relationshipSystem->getRelationshipsFor(mother);
+        // Добавляем ребенка в древо
+        tree->addFamilyMember(child);
+
+        // Устанавливаем отношения родитель-ребенок
+        relSystem->addRelationship(mother, child, "parent-child");
+        relSystem->addRelationship(father, child, "parent-child");
+
+        // Добавляем братские отношения с другими детьми
+        auto motherChildren = relSystem->getRelationshipsFor(mother);
         for (const auto& rel : motherChildren) {
             if (get<1>(rel) == "parent-child" && get<0>(rel) != child) {
-                relationshipSystem->addRelationship(get<0>(rel), child, "sibling");
+                relSystem->addRelationship(get<0>(rel), child, "sibling");
             }
         }
 
-        cout << "Родился новый член семьи: " << child->getFullName() << endl;
-        child->notifyPersonChanged(*child, "birth");
+        cout << "Зарегистрировано рождение: " << child->getFullName() << endl;
+    }
+};
+
+// Событие смерти
+class DeathEvent : public FamilyEvent {
+private:
+    shared_ptr<Person> person;
+    string deathPlace;
+
+public:
+    DeathEvent(shared_ptr<GenealogicalTree> tree,
+        shared_ptr<Person> person,
+        const string& deathPlace)
+        : FamilyEvent(tree), person(person), deathPlace(deathPlace) {
+    }
+
+    void execute() override {
+        person->setDeath(deathPlace);
+        cout << "Зарегистрирована смерть: " << person->getFullName()
+            << ", место: " << deathPlace << endl;
+    }
+};
+
+// Событие брака
+class MarriageEvent : public FamilyEvent {
+private:
+    shared_ptr<Person> person1;
+    shared_ptr<Person> person2;
+
+public:
+    MarriageEvent(shared_ptr<GenealogicalTree> tree,
+        shared_ptr<Person> person1,
+        shared_ptr<Person> person2)
+        : FamilyEvent(tree), person1(person1), person2(person2) {
+    }
+
+    void execute() override {
+        auto relSystem = tree->getRelationshipSystem();
+        relSystem->addRelationship(person1, person2, "spouse");
+        relSystem->addRelationship(person2, person1, "spouse");
+        cout << "Зарегистрирован брак между: " << person1->getFullName()
+            << " и " << person2->getFullName() << endl;
+    }
+};
+
+// Событие развода
+class DivorceEvent : public FamilyEvent {
+private:
+    shared_ptr<Person> person1;
+    shared_ptr<Person> person2;
+
+public:
+    DivorceEvent(shared_ptr<GenealogicalTree> tree,
+        shared_ptr<Person> person1,
+        shared_ptr<Person> person2)
+        : FamilyEvent(tree), person1(person1), person2(person2) {
+    }
+
+    void execute() override {
+        auto relSystem = tree->getRelationshipSystem();
+        relSystem->removeRelationship(person1, person2, "spouse");
+        relSystem->removeRelationship(person2, person1, "spouse");
+
+        // Добавляем отношения "бывший супруг"
+        relSystem->addRelationship(person1, person2, "ex-spouse");
+        relSystem->addRelationship(person2, person1, "ex-spouse");
+
+        cout << "Зарегистрирован развод между: " << person1->getFullName()
+            << " и " << person2->getFullName() << endl;
     }
 };
 
@@ -197,63 +382,103 @@ public:
 class LoggerObserver : public IObserver {
 public:
     void onPersonChanged(const Person& person, const string& changeType) override {
-        cout << "[Лог] Изменение в Person: " << person.getFullName() 
-             << ", тип изменения: " << changeType << endl;
+        cout << "[Лог] Изменение в Person: " << person.getFullName()
+            << ", тип изменения: " << changeType << endl;
     }
 
-    void onRelationshipChanged(const Relationship& rel, 
-                             const shared_ptr<Person>& p1, 
-                             const shared_ptr<Person>& p2, 
-                             const string& changeType) override {
-        cout << "[Лог] Изменение в Relationship: " 
-             << p1->getFullName() << " -> " << p2->getFullName()
-             << ", тип изменения: " << changeType << endl;
+    void onRelationshipChanged(const Relationship& rel,
+        const shared_ptr<Person>& p1,
+        const shared_ptr<Person>& p2,
+        const string& changeType) override {
+        cout << "[Лог] Изменение в Relationship: "
+            << p1->getFullName() << " -> " << p2->getFullName()
+            << ", тип изменения: " << changeType << endl;
     }
 };
 
 int main() {
     SetConsoleOutputCP(1251); // Настраиваем консоль для русского текста
-
-    // Создаем наблюдателя
+    // Создаем древо и наблюдателя
+    auto tree = make_shared<GenealogicalTree>();
     auto logger = make_shared<LoggerObserver>();
 
-    // Создаем систему отношений
-    auto relationshipSystem = make_shared<Relationship>();
-    relationshipSystem->addObserver(logger);
-
-    // Создаем людей и подписываем на наблюдателя
-    auto ivan = make_shared<Person>("Иван", "Иванов", "Иванович", "мужской", "Москва", "Инженер");
+    // 1. Создаем основателей семьи
+    cout << "\n=== Создаем основателей семьи ===" << endl;
+    auto ivan = make_shared<Person>("Иван", "Иванов", "Петрович", "мужской",
+        "Москва, 1950", "Инженер");
     ivan->addObserver(logger);
-    
-    auto maria = make_shared<Person>("Мария", "Иванова", "Петровна", "женский", "Санкт-Петербург", "Учитель");
+    tree->addFamilyMember(ivan);
+
+    auto maria = make_shared<Person>("Мария", "Иванова", "Сергеевна", "женский",
+        "Санкт-Петербург, 1952", "Учитель");
     maria->addObserver(logger);
-    
-    auto petr = make_shared<Person>("Петр", "Иванов", "Иванович", "мужской", "Москва", "Студент");
-    petr->addObserver(logger);
+    tree->addFamilyMember(maria);
 
-    // Выводим информацию о людях
-    cout << "=== Информация о людях ===" << endl;
-    ivan->printInfo();
+    // 2. Регистрируем их брак
+    cout << "\n=== Регистрируем брак ===" << endl;
+    MarriageEvent marriage(tree, ivan, maria);
+    marriage.execute();
+
+    // 3. Рождение детей
+    cout << "\n=== Рождение детей ===" << endl;
+    BirthEvent birth1(tree, maria, ivan, "Алексей", "Иванов", "Иванович",
+        "мужской", "Москва, 1975", "Программист");
+    birth1.execute();
+
+    BirthEvent birth2(tree, maria, ivan, "Ольга", "Иванова", "Ивановна",
+        "женский", "Москва, 1978", "Врач");
+    birth2.execute();
+
+    // 4. Алексей женится
+    cout << "\n=== Алексей создает свою семью ===" << endl;
+    auto alexey = tree->findPerson("Иванов Алексей Иванович");
+    auto ekaterina = make_shared<Person>("Екатерина", "Иванова", "Дмитриевна", "женский",
+        "Москва, 1980", "Дизайнер");
+    ekaterina->addObserver(logger);
+    tree->addFamilyMember(ekaterina);
+
+    MarriageEvent marriage2(tree, alexey, ekaterina);
+    marriage2.execute();
+
+    // 5. Рождение ребенка у Алексея и Екатерины
+    cout << "\n=== Рождение ребенка у Алексея ===" << endl;
+    BirthEvent birth3(tree, ekaterina, alexey, "Дмитрий", "Иванов", "Алексеевич",
+        "мужской", "Москва, 2005", "Школьник");
+    birth3.execute();
+
+    // 6. Выводим информацию
+    cout << "\n=== Информация о семье ===" << endl;
+    tree->printAllMembers();
     cout << endl;
-    maria->printInfo();
+
+    cout << "=== Информация об Иване ===" << endl;
+    tree->printPersonInfo("Иванов Иван Петрович");
     cout << endl;
 
-    // Событие свадьбы
-    cout << "\n=== Событие: Свадьба ===" << endl;
-    relationshipSystem->addRelationship(ivan, maria, "spouse");
-    relationshipSystem->addRelationship(maria, ivan, "spouse");
-
-    // Событие рождения ребенка
-    cout << "\n=== Событие: Рождение ребенка ===" << endl;
-    BirthEvent birth(relationshipSystem, maria, ivan, petr);
-    birth.execute();
-    petr->printInfo();
+    cout << "=== Связи Марии ===" << endl;
+    tree->printRelationships("Иванова Мария Сергеевна");
     cout << endl;
 
-    // Событие смерти
-    cout << "\n=== Событие: Смерть ===" << endl;
-    ivan->setDeath("Сочи");
-    ivan->printInfo();
+    cout << "=== Связи Алексея ===" << endl;
+    tree->printRelationships("Иванов Алексей Иванович");
+    cout << endl;
 
+    // 7. Регистрируем смерть Ивана
+    cout << "\n=== Регистрируем смерть Ивана ===" << endl;
+    DeathEvent death(tree, ivan, "Сочи, 2020");
+    death.execute();
+
+    // 8. Выводим обновленную информацию
+    cout << "\n=== Обновленная информация об Иване ===" << endl;
+    tree->printPersonInfo("Иванов Иван Петрович");
+
+    // 9. Развод Алексея и Екатерины
+    cout << "\n=== Развод Алексея и Екатерины ===" << endl;
+    DivorceEvent divorce(tree, alexey, ekaterina);
+    divorce.execute();
+
+    // 10. Проверяем связи после развода
+    cout << "\n=== Связи Алексея после развода ===" << endl;
+    tree->printRelationships("Иванов Алексей Иванович");
     return 0;
 }
