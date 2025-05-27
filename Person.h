@@ -1,6 +1,14 @@
 #ifndef PERSON_H
 #define PERSON_H
 
+
+#include <iostream>
+#include <string>
+#include <vector>
+#include <memory>
+#include <algorithm>
+#include <windows.h>
+#include <unordered_set>
 #include <string>
 #include "observable.h"
 

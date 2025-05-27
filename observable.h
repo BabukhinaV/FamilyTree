@@ -1,7 +1,11 @@
 #ifndef OBSERVABLE_H
 #define OBSERVABLE_H
-
+#include <iostream>
+#include <string>
+#include <vector>
 #include <memory>
+#include <algorithm>
+#include <windows.h>
 #include <unordered_set>
 #include "person.h"
 #include "relationship.h"

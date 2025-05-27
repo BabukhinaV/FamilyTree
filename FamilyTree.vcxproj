@@ -127,7 +127,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="genealogical_tree.cpp" />
+    <ClCompile Include="logger_observer.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="observable.cpp" />
+    <ClCompile Include="Person.cpp" />
+    <ClCompile Include="relationship.cpp" />
+    <ClCompile Include="tree_builder.cpp" />
+    <ClCompile Include="tree_node.cpp" />
+    <ClCompile Include="tree_visualizer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="genealogical_tree.h" />

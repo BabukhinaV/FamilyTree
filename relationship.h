@@ -1,9 +1,14 @@
 #ifndef RELATIONSHIP_H
 #define RELATIONSHIP_H
 
+#include <iostream>
+#include <string>
 #include <vector>
-#include <tuple>
 #include <memory>
+#include <algorithm>
+#include <windows.h>
+#include <unordered_set>
+#include <tuple>
 #include "observable.h"
 #include "person.h"
 
