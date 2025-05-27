@@ -129,6 +129,16 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="genealogical_tree.h" />
+    <ClInclude Include="logger_observer.h" />
+    <ClInclude Include="observable.h" />
+    <ClInclude Include="Person.h" />
+    <ClInclude Include="relationship.h" />
+    <ClInclude Include="tree_builder.h" />
+    <ClInclude Include="tree_node.h" />
+    <ClInclude Include="tree_visualizer.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
