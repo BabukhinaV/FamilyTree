@@ -128,18 +128,20 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="genealogical_tree.cpp" />
-    <ClCompile Include="logger_observer.cpp" />
+    <ClCompile Include="observer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="observable.cpp" />
     <ClCompile Include="Person.cpp" />
     <ClCompile Include="relationship.cpp" />
+    <ClCompile Include="family_events.cpp" />
     <ClCompile Include="tree_builder.cpp" />
     <ClCompile Include="tree_node.cpp" />
     <ClCompile Include="tree_visualizer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="genealogical_tree.h" />
-    <ClInclude Include="logger_observer.h" />
+    <ClInclude Include="family_events.h" />
+    <ClInclude Include="observer.h" />
     <ClInclude Include="observable.h" />
     <ClInclude Include="Person.h" />
     <ClInclude Include="relationship.h" />

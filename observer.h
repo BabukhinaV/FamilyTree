@@ -1,7 +1,7 @@
 #ifndef LOGGER_OBSERVER_H
 #define LOGGER_OBSERVER_H
 
-#include "observable.h"
+#include "observer.h"
 
 class LoggerObserver : public IObserver {
 public:

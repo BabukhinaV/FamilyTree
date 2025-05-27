@@ -5,7 +5,13 @@
 #include <algorithm>
 #include <windows.h>
 #include <unordered_set>
+#include <functional> 
+#include <unordered_map> 
+#include <memory> 
+#include <tuple>
 
+// Предварительное объявление
+class GenealogicalTree;
 using namespace std;
 
 // Предварительные объявления
@@ -73,6 +79,10 @@ public:
     string getDeathPlace() const { return deathPlace; }
     string getOccupation() const { return occupation; }
     bool isAlive() const { return alive; }
+
+    string getShortName() const {
+        return lastName + " " + firstName[0] + "." + middleName[0] + ".";
+    }
 
     // Сеттеры
     void setDeath(string place) {
@@ -169,14 +179,180 @@ public:
     }
 };
 
+// Класс узла дерева для отображения (Компоновщик)
+class TreeNode {
+public:
+    virtual ~TreeNode() = default;
+    virtual void print(int level = 0) const = 0;
+    virtual void addChild(std::shared_ptr<TreeNode> child) {}
+    virtual std::vector<std::shared_ptr<TreeNode>> getChildren() const { return {}; }
+};
+
+// Класс для отображения человека
+class PersonNode : public TreeNode {
+private:
+    shared_ptr<Person> person;
+    vector<shared_ptr<TreeNode>> children;
+
+public:
+    PersonNode(shared_ptr<Person> p) : person(p) {}
+
+    void print(int level = 0) const override {
+        cout << string(level * 4, ' ') << person->getLastName() << " "
+            << person->getFirstName()[0] << "." << person->getMiddleName()[0] << ".";
+    }
+
+    void addChild(shared_ptr<TreeNode> child) override {
+        children.push_back(child);
+    }
+
+    vector<shared_ptr<TreeNode>> getChildren() const override {
+        return children;
+    }
+
+    shared_ptr<Person> getPerson() const { return person; }
+};
+
+// Класс для отображения пары (супруги)
+class CoupleNode : public TreeNode {
+private:
+    shared_ptr<PersonNode> person1;
+    shared_ptr<PersonNode> person2;
+    vector<shared_ptr<TreeNode>> children;
+
+public:
+    CoupleNode(shared_ptr<PersonNode> p1, shared_ptr<PersonNode> p2)
+        : person1(p1), person2(p2) {
+    }
+
+    void print(int level = 0) const override {
+        person1->print(level);
+        cout << " + ";
+        person2->print(0);
+    }
+
+    void addChild(shared_ptr<TreeNode> child) override {
+        children.push_back(child);
+    }
+
+    vector<shared_ptr<TreeNode>> getChildren() const override {
+        return children;
+    }
+};
+
+// Класс для построения дерева отношений
+class TreeBuilder {
+private:
+    std::shared_ptr<GenealogicalTree> tree;
+    std::unordered_map<std::shared_ptr<Person>, std::shared_ptr<PersonNode>> personToNode;
+
+    std::shared_ptr<PersonNode> getOrCreateNode(std::shared_ptr<Person> person) {
+        if (personToNode.find(person) == personToNode.end()) {
+            personToNode[person] = std::make_shared<PersonNode>(person);
+        }
+        return personToNode[person];
+    }
+
+    std::shared_ptr<TreeNode> buildSubtree(std::shared_ptr<Person> person, std::unordered_set<std::shared_ptr<Person>>& visited) {
+        if (visited.count(person)) return nullptr;
+        visited.insert(person);
+
+        auto relSystem = tree->getRelationshipSystem();
+        auto relationships = relSystem->getRelationshipsFor(person);
+
+        // Находим супруга
+        std::shared_ptr<Person> spouse;
+        for (const auto& rel : relationships) {
+            if (std::get<1>(rel) == "spouse") {
+                spouse = std::get<0>(rel);
+                break;
+            }
+        }
+
+        std::shared_ptr<TreeNode> node;
+        if (spouse) {
+            auto personNode = getOrCreateNode(person);
+            auto spouseNode = getOrCreateNode(spouse);
+            auto coupleNode = std::make_shared<CoupleNode>(personNode, spouseNode);
+            node = coupleNode;
+        }
+        else {
+            node = getOrCreateNode(person);
+        }
+
+        // Находим детей
+        std::vector<std::shared_ptr<Person>> children;
+        for (const auto& rel : relationships) {
+            if (std::get<1>(rel) == "child-parent") {
+                children.push_back(std::get<0>(rel));
+            }
+        }
+
+        // Сортируем детей по имени
+        std::sort(children.begin(), children.end(),
+            [](const auto& a, const auto& b) {
+                return a->getFullName() < b->getFullName();
+            });
+
+        // Рекурсивно строим поддеревья для детей
+        for (const auto& child : children) {
+            auto childNode = buildSubtree(child, visited);
+            if (childNode) {
+                node->addChild(childNode);
+            }
+        }
+
+        return node;
+    }
+
+public:
+    TreeBuilder(std::shared_ptr<GenealogicalTree> t) : tree(t) {}
+
+    std::shared_ptr<TreeNode> buildTree() {
+        // Находим корни (людей без родителей)
+        std::unordered_set<std::shared_ptr<Person>> roots;
+        for (const auto& person : tree->familyMembers) {
+            bool hasParents = false;
+            auto relationships = tree->getRelationshipSystem()->getRelationshipsFor(person);
+            for (const auto& rel : relationships) {
+                if (std::get<1>(rel) == "parent-child") {
+                    hasParents = true;
+                    break;
+                }
+            }
+            if (!hasParents) {
+                roots.insert(person);
+            }
+        }
+
+        std::unordered_set<std::shared_ptr<Person>> visited;
+        if (roots.size() == 1) {
+            return buildSubtree(*roots.begin(), visited);
+        }
+        else if (roots.size() > 1) {
+            auto root = std::make_shared<PersonNode>(nullptr);
+            for (const auto& person : roots) {
+                auto subtree = buildSubtree(person, visited);
+                if (subtree) {
+                    root->addChild(subtree);
+                }
+            }
+            return root;
+        }
+        return nullptr;
+    }
+};
 // Класс генеалогического древа (только хранение и вывод информации)
-class GenealogicalTree {
+class GenealogicalTree : public enable_shared_from_this<GenealogicalTree> {
 private:
     vector<shared_ptr<Person>> familyMembers;
     shared_ptr<Relationship> relationshipSystem;
 
 public:
     GenealogicalTree() : relationshipSystem(make_shared<Relationship>()) {}
+    GenealogicalTree() : relationshipSystem(std::make_shared<Relationship>()) {}
+
+    friend class TreeBuilder;
 
     // Добавление нового члена семьи
     void addFamilyMember(shared_ptr<Person> person) {
@@ -256,6 +432,56 @@ public:
 
             cout << "- " << get<0>(rel)->getFullName() << " (" << relationType << ")" << endl;
         }
+
+    }
+
+    void printTree() const {
+        std::cout << "=== Генеалогическое древо ===" << std::endl;
+        auto self = const_cast<GenealogicalTree*>(this)->shared_from_this();
+        TreeBuilder builder(self);
+        auto root = builder.buildTree();
+
+        if (!root) {
+            std::cout << "Дерево пустое." << std::endl;
+            return;
+        }
+
+        // Лямбда для рекурсивного вывода
+        std::function<void(const std::shared_ptr<TreeNode>&, int, std::vector<bool>)> printNode =
+            [&](const std::shared_ptr<TreeNode>& node, int level, std::vector<bool> lastFlags) {
+            // Вывод префикса
+            for (int i = 0; i < level - 1; ++i) {
+                if (i < lastFlags.size() && lastFlags[i]) {
+                    std::cout << "    ";
+                }
+                else {
+                    std::cout << "|   ";
+                }
+            }
+
+            if (level > 0) {
+                if (lastFlags.empty() || lastFlags.back()) {
+                    std::cout << "\\--- ";
+                }
+                else {
+                    std::cout << "|--- ";
+                }
+            }
+
+            // Вывод узла
+            node->print(0);
+            std::cout << std::endl;
+
+            // Рекурсивный вывод детей
+            auto children = node->getChildren();
+            for (size_t i = 0; i < children.size(); ++i) {
+                auto newFlags = lastFlags;
+                newFlags.push_back(i == children.size() - 1);
+                printNode(children[i], level + 1, newFlags);
+            }
+            };
+
+        printNode(root, 0, {});
     }
 };
 
@@ -480,5 +706,8 @@ int main() {
     // 10. Проверяем связи после развода
     cout << "\n=== Связи Алексея после развода ===" << endl;
     tree->printRelationships("Иванов Алексей Иванович");
+
+    cout << "\n=== Генеалогическое древо ===" << endl;
+    tree->printTree();
     return 0;
 }

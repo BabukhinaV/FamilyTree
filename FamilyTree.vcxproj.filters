@@ -39,7 +39,10 @@
     <ClCompile Include="tree_visualizer.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="logger_observer.cpp">
+    <ClCompile Include="observer.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="family_events.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
@@ -65,7 +68,10 @@
     <ClInclude Include="tree_visualizer.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="logger_observer.h">
+    <ClInclude Include="observer.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="family_events.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>

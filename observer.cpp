@@ -1,4 +1,4 @@
-#include "logger_observer.h"
+#include "observer.h"
 #include <iostream>
 
 void LoggerObserver::onPersonChanged(const Person& person, const std::string& changeType) {
