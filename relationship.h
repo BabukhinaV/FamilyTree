@@ -1,16 +1,12 @@
-#ifndef RELATIONSHIP_H
-#define RELATIONSHIP_H
+#pragma once
 
-#include <iostream>
-#include <string>
 #include <vector>
-#include <memory>
-#include <algorithm>
-#include <windows.h>
-#include <unordered_set>
+#include <string>
 #include <tuple>
-#include "observable.h"
-#include "person.h"
+#include <memory>
+
+#include "Observable.h"
+#include "Person.h"
 
 class Relationship : public Observable {
 private:
@@ -20,9 +16,6 @@ public:
     void addRelationship(std::shared_ptr<Person> person1, std::shared_ptr<Person> person2, std::string relationType);
     void removeRelationship(std::shared_ptr<Person> person1, std::shared_ptr<Person> person2, std::string relationType);
     std::vector<std::tuple<std::shared_ptr<Person>, std::string>> getRelationshipsFor(std::shared_ptr<Person> person) const;
-    std::vector<std::shared_ptr<Person>> getParents(std::shared_ptr<Person> person) const;
-    std::vector<std::shared_ptr<Person>> getChildren(std::shared_ptr<Person> parent) const;
-    std::vector<std::shared_ptr<Person>> getSiblings(std::shared_ptr<Person> person) const;
+    const std::vector<std::tuple<std::shared_ptr<Person>, std::shared_ptr<Person>, std::string>>& getAllRelationships() const;
+    void clear();
 };
-
-#endif // RELATIONSHIP_H

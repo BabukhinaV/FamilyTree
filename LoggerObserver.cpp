@@ -1,4 +1,6 @@
-#include "observer.h"
+#include "LoggerObserver.h"
+#include "Person.h"
+#include "Relationship.h"
 #include <iostream>
 
 void LoggerObserver::onPersonChanged(const Person& person, const std::string& changeType) {

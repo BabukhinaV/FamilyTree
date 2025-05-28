@@ -1,15 +1,17 @@
-#ifndef LOGGER_OBSERVER_H
-#define LOGGER_OBSERVER_H
+#pragma once
 
-#include "observer.h"
+#include <string>
+#include <memory>
 
-class LoggerObserver : public IObserver {
+class Person;
+class Relationship;
+
+class IObserver {
 public:
-    void onPersonChanged(const Person& person, const std::string& changeType) override;
-    void onRelationshipChanged(const Relationship& rel,
+    virtual ~IObserver() = default;
+    virtual void onPersonChanged(const Person& person, const std::string& changeType) = 0;
+    virtual void onRelationshipChanged(const Relationship& rel,
         const std::shared_ptr<Person>& p1,
         const std::shared_ptr<Person>& p2,
-        const std::string& changeType) override;
+        const std::string& changeType) = 0;
 };
-
-#endif // LOGGER_OBSERVER_H

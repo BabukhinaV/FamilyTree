@@ -1,16 +1,9 @@
-#ifndef PERSON_H
-#define PERSON_H
+#pragma once
 
-
-#include <iostream>
 #include <string>
-#include <vector>
 #include <memory>
-#include <algorithm>
-#include <windows.h>
-#include <unordered_set>
-#include <string>
-#include "observable.h"
+
+#include "Observable.h"
 
 class Person : public Observable {
 private:
@@ -21,15 +14,15 @@ private:
     std::string birthPlace;
     std::string deathPlace;
     std::string occupation;
+    std::string birthDate;
+    std::string biography;
     bool alive;
 
 public:
-    Person(std::string fName, std::string lName, std::string mName,
-        std::string gender, std::string bPlace, std::string occupation);
+    Person(std::string fName, std::string lName, std::string mName, std::string gender,
+        std::string bPlace, std::string bDate, std::string occupation, std::string bio = "");
 
-    // Геттеры
     std::string getFullName() const;
-    std::string getShortName() const;
     std::string getFirstName() const;
     std::string getLastName() const;
     std::string getMiddleName() const;
@@ -37,11 +30,13 @@ public:
     std::string getBirthPlace() const;
     std::string getDeathPlace() const;
     std::string getOccupation() const;
+    std::string getBirthDate() const;
+    std::string getBiography() const;
     bool isAlive() const;
 
-    // Сеттеры
     void setDeath(std::string place);
     void printInfo() const;
-};
 
-#endif // PERSON_H
+    std::string serialize() const;
+    static std::shared_ptr<Person> deserialize(const std::string& data);
+};

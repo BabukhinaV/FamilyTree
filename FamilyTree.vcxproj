@@ -127,27 +127,22 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="genealogical_tree.cpp" />
-    <ClCompile Include="observer.cpp" />
+    <ClCompile Include="GenealogicalTree.cpp" />
+    <ClCompile Include="LoggerObserver.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="observable.cpp" />
+    <ClCompile Include="Observable.cpp" />
     <ClCompile Include="Person.cpp" />
-    <ClCompile Include="relationship.cpp" />
-    <ClCompile Include="family_events.cpp" />
-    <ClCompile Include="tree_builder.cpp" />
-    <ClCompile Include="tree_node.cpp" />
-    <ClCompile Include="tree_visualizer.cpp" />
+    <ClCompile Include="Relationship.cpp" />
+    <ClCompile Include="FamilyEvent.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="genealogical_tree.h" />
-    <ClInclude Include="family_events.h" />
-    <ClInclude Include="observer.h" />
-    <ClInclude Include="observable.h" />
+    <ClInclude Include="GenealogicalTree.h" />
+    <ClInclude Include="FamilyEvent.h" />
+    <ClInclude Include="Observer.h" />
+    <ClInclude Include="LoggerObserver.h" />
+    <ClInclude Include="Observable.h" />
     <ClInclude Include="Person.h" />
-    <ClInclude Include="relationship.h" />
-    <ClInclude Include="tree_builder.h" />
-    <ClInclude Include="tree_node.h" />
-    <ClInclude Include="tree_visualizer.h" />
+    <ClInclude Include="Relationship.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\Concole\family_data.txt" />

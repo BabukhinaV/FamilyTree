@@ -1,10 +1,11 @@
-#ifndef GENEALOGICAL_TREE_H
-#define GENEALOGICAL_TREE_H
+#pragma once
 
 #include <vector>
+#include <string>
 #include <memory>
-#include "person.h"
-#include "relationship.h"
+
+#include "Person.h"
+#include "Relationship.h"
 
 class GenealogicalTree {
 private:
@@ -13,13 +14,17 @@ private:
 
 public:
     GenealogicalTree();
+
     void addFamilyMember(std::shared_ptr<Person> person);
     std::shared_ptr<Relationship> getRelationshipSystem() const;
+    const std::vector<std::shared_ptr<Person>>& getFamilyMembers() const;
     std::shared_ptr<Person> findPerson(const std::string& fullName) const;
-    void printPersonInfo(const std::string& fullName) const;
-    void printAllMembers() const;
-    void printRelationships(const std::string& fullName) const;
-    std::vector<std::shared_ptr<Person>> getAllMembers() const;
-};
 
-#endif // GENEALOGICAL_TREE_H
+    void printAllMembers() const;
+    void printPersonInfo(const std::string& fullName) const;
+    void printAllRelationships() const;
+    void printRelationships(const std::string& fullName) const;
+
+    void saveToFile(const std::string& filename);
+    bool loadFromFile(const std::string& filename);
+};

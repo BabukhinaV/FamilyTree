@@ -1,5 +1,7 @@
-#include "observable.h"
-#include "observer.h"
+#include "Observable.h"
+#include "Observer.h"
+#include "Person.h"
+#include "Relationship.h"
 
 void Observable::addObserver(const std::shared_ptr<IObserver>& observer) {
     observers.insert(observer);
