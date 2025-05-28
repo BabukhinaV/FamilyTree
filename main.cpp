@@ -2,10 +2,21 @@
 #include <string>
 #include <memory>
 #include <Windows.h>
-
+#include <regex>
 #include "GenealogicalTree.h"
 #include "FamilyEvent.h"
 #include "LoggerObserver.h"
+
+// === Date validation function ===
+bool isValidDate(const std::string& date) {
+    std::regex datePattern(R"((0[1-9]|[12][0-9]|3[01])\.(0[1-9]|1[012])\.\d{4})");
+    return std::regex_match(date, datePattern);
+}
+
+// === Gender validation function ===
+bool isValidGender(const std::string& gender) {
+    return gender == "мужской" || gender == "женский";
+}
 
 // === Меню ===
 void printMenu() {
@@ -64,9 +75,22 @@ void triggerEvent(std::shared_ptr<GenealogicalTree> tree) {
         std::cout << "Имя ребёнка: "; std::getline(std::cin, fn);
         std::cout << "Фамилия: "; std::getline(std::cin, ln);
         std::cout << "Отчество: "; std::getline(std::cin, mn);
-        std::cout << "Пол: "; std::getline(std::cin, g);
+        do{
+            std::cout << "Введите пол (мужской/женский): ";
+            std::getline(std::cin, g);
+            if (!isValidGender(g)) {
+                std::cout << "Ошибка: пол должен быть 'мужской' или 'женский'.\n";
+        }
+        } while (!isValidGender(g));
         std::cout << "Место рождения: "; std::getline(std::cin, bPlace);
         std::cout << "Дата рождения: "; std::getline(std::cin, bDate);
+        do {
+            std::cout << "Введите дату рождения (DD.MM.YYYY): ";
+            std::getline(std::cin, bDate);
+            if (!isValidDate(bDate)) {
+                std::cout << "Ошибка: дата должна быть в формате DD.MM.YYYY (например, 01.01.2000).\n";
+            }
+        } while (!isValidDate(bDate));
         std::cout << "Профессия: "; std::getline(std::cin, occ);
         std::cout << "Биография (необязательно): "; std::getline(std::cin, bio);
 
@@ -106,12 +130,22 @@ void addPerson(GenealogicalTree& tree) {
     std::getline(std::cin, lastName);
     std::cout << "Введите отчество: ";
     std::getline(std::cin, middleName);
-    std::cout << "Введите пол (мужской/женский): ";
-    std::getline(std::cin, gender);
+    do {
+        std::cout << "Введите пол (мужской/женский): ";
+        std::getline(std::cin, gender);
+        if (!isValidGender(gender)) {
+            std::cout << "Ошибка: пол должен быть 'мужской' или 'женский'.\n";
+        }
+    } while (!isValidGender(gender));
     std::cout << "Введите место рождения: ";
     std::getline(std::cin, birthPlace);
-    std::cout << "Введите дату рождения: ";
-    std::getline(std::cin, birthDate);
+    do {
+        std::cout << "Введите дату рождения (DD.MM.YYYY): ";
+        std::getline(std::cin, birthDate);
+        if (!isValidDate(birthDate)) {
+            std::cout << "Ошибка: дата должна быть в формате DD.MM.YYYY (например, 01.01.2000).\n";
+        }
+    } while (!isValidDate(birthDate));
     std::cout << "Введите профессию: ";
     std::getline(std::cin, occupation);
     std::cout << "Введите биографию (необязательно): ";
@@ -220,6 +254,7 @@ int main() {
     tree->loadFromFile("family_data.txt");
 
     int choice;
+
     do {
         printMenu();
         std::cin >> choice;
