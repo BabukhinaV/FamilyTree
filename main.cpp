@@ -5,13 +5,7 @@
 #include <algorithm>
 #include <windows.h>
 #include <unordered_set>
-#include <functional> 
-#include <unordered_map> 
-#include <memory> 
-#include <tuple>
 
-// Предварительное объявление
-class GenealogicalTree;
 using namespace std;
 
 // Предварительные объявления
@@ -79,10 +73,6 @@ public:
     string getDeathPlace() const { return deathPlace; }
     string getOccupation() const { return occupation; }
     bool isAlive() const { return alive; }
-
-    string getShortName() const {
-        return lastName + " " + firstName[0] + "." + middleName[0] + ".";
-    }
 
     // Сеттеры
     void setDeath(string place) {
@@ -179,180 +169,14 @@ public:
     }
 };
 
-// Класс узла дерева для отображения (Компоновщик)
-class TreeNode {
-public:
-    virtual ~TreeNode() = default;
-    virtual void print(int level = 0) const = 0;
-    virtual void addChild(std::shared_ptr<TreeNode> child) {}
-    virtual std::vector<std::shared_ptr<TreeNode>> getChildren() const { return {}; }
-};
-
-// Класс для отображения человека
-class PersonNode : public TreeNode {
-private:
-    shared_ptr<Person> person;
-    vector<shared_ptr<TreeNode>> children;
-
-public:
-    PersonNode(shared_ptr<Person> p) : person(p) {}
-
-    void print(int level = 0) const override {
-        cout << string(level * 4, ' ') << person->getLastName() << " "
-            << person->getFirstName()[0] << "." << person->getMiddleName()[0] << ".";
-    }
-
-    void addChild(shared_ptr<TreeNode> child) override {
-        children.push_back(child);
-    }
-
-    vector<shared_ptr<TreeNode>> getChildren() const override {
-        return children;
-    }
-
-    shared_ptr<Person> getPerson() const { return person; }
-};
-
-// Класс для отображения пары (супруги)
-class CoupleNode : public TreeNode {
-private:
-    shared_ptr<PersonNode> person1;
-    shared_ptr<PersonNode> person2;
-    vector<shared_ptr<TreeNode>> children;
-
-public:
-    CoupleNode(shared_ptr<PersonNode> p1, shared_ptr<PersonNode> p2)
-        : person1(p1), person2(p2) {
-    }
-
-    void print(int level = 0) const override {
-        person1->print(level);
-        cout << " + ";
-        person2->print(0);
-    }
-
-    void addChild(shared_ptr<TreeNode> child) override {
-        children.push_back(child);
-    }
-
-    vector<shared_ptr<TreeNode>> getChildren() const override {
-        return children;
-    }
-};
-
-// Класс для построения дерева отношений
-class TreeBuilder {
-private:
-    std::shared_ptr<GenealogicalTree> tree;
-    std::unordered_map<std::shared_ptr<Person>, std::shared_ptr<PersonNode>> personToNode;
-
-    std::shared_ptr<PersonNode> getOrCreateNode(std::shared_ptr<Person> person) {
-        if (personToNode.find(person) == personToNode.end()) {
-            personToNode[person] = std::make_shared<PersonNode>(person);
-        }
-        return personToNode[person];
-    }
-
-    std::shared_ptr<TreeNode> buildSubtree(std::shared_ptr<Person> person, std::unordered_set<std::shared_ptr<Person>>& visited) {
-        if (visited.count(person)) return nullptr;
-        visited.insert(person);
-
-        auto relSystem = tree->getRelationshipSystem();
-        auto relationships = relSystem->getRelationshipsFor(person);
-
-        // Находим супруга
-        std::shared_ptr<Person> spouse;
-        for (const auto& rel : relationships) {
-            if (std::get<1>(rel) == "spouse") {
-                spouse = std::get<0>(rel);
-                break;
-            }
-        }
-
-        std::shared_ptr<TreeNode> node;
-        if (spouse) {
-            auto personNode = getOrCreateNode(person);
-            auto spouseNode = getOrCreateNode(spouse);
-            auto coupleNode = std::make_shared<CoupleNode>(personNode, spouseNode);
-            node = coupleNode;
-        }
-        else {
-            node = getOrCreateNode(person);
-        }
-
-        // Находим детей
-        std::vector<std::shared_ptr<Person>> children;
-        for (const auto& rel : relationships) {
-            if (std::get<1>(rel) == "child-parent") {
-                children.push_back(std::get<0>(rel));
-            }
-        }
-
-        // Сортируем детей по имени
-        std::sort(children.begin(), children.end(),
-            [](const auto& a, const auto& b) {
-                return a->getFullName() < b->getFullName();
-            });
-
-        // Рекурсивно строим поддеревья для детей
-        for (const auto& child : children) {
-            auto childNode = buildSubtree(child, visited);
-            if (childNode) {
-                node->addChild(childNode);
-            }
-        }
-
-        return node;
-    }
-
-public:
-    TreeBuilder(std::shared_ptr<GenealogicalTree> t) : tree(t) {}
-
-    std::shared_ptr<TreeNode> buildTree() {
-        // Находим корни (людей без родителей)
-        std::unordered_set<std::shared_ptr<Person>> roots;
-        for (const auto& person : tree->familyMembers) {
-            bool hasParents = false;
-            auto relationships = tree->getRelationshipSystem()->getRelationshipsFor(person);
-            for (const auto& rel : relationships) {
-                if (std::get<1>(rel) == "parent-child") {
-                    hasParents = true;
-                    break;
-                }
-            }
-            if (!hasParents) {
-                roots.insert(person);
-            }
-        }
-
-        std::unordered_set<std::shared_ptr<Person>> visited;
-        if (roots.size() == 1) {
-            return buildSubtree(*roots.begin(), visited);
-        }
-        else if (roots.size() > 1) {
-            auto root = std::make_shared<PersonNode>(nullptr);
-            for (const auto& person : roots) {
-                auto subtree = buildSubtree(person, visited);
-                if (subtree) {
-                    root->addChild(subtree);
-                }
-            }
-            return root;
-        }
-        return nullptr;
-    }
-};
 // Класс генеалогического древа (только хранение и вывод информации)
-class GenealogicalTree : public enable_shared_from_this<GenealogicalTree> {
+class GenealogicalTree {
 private:
     vector<shared_ptr<Person>> familyMembers;
     shared_ptr<Relationship> relationshipSystem;
 
 public:
     GenealogicalTree() : relationshipSystem(make_shared<Relationship>()) {}
-    GenealogicalTree() : relationshipSystem(std::make_shared<Relationship>()) {}
-
-    friend class TreeBuilder;
 
     // Добавление нового члена семьи
     void addFamilyMember(shared_ptr<Person> person) {
@@ -409,82 +233,257 @@ public:
             return;
         }
 
+        // Сначала выводим детей (если есть)
+        bool hasChildren = false;
         for (const auto& rel : relationships) {
-            string relationType;
             if (get<1>(rel) == "parent-child") {
-                relationType = "родитель";
+                if (!hasChildren) {
+                    cout << "Дети:" << endl;
+                    hasChildren = true;
+                }
+                cout << "- " << get<0>(rel)->getFullName() << endl;
             }
-            else if (get<1>(rel) == "child-parent") {
-                relationType = "ребенок";
-            }
-            else if (get<1>(rel) == "sibling") {
-                relationType = "брат/сестра";
-            }
-            else if (get<1>(rel) == "spouse") {
-                relationType = "супруг(а)";
-            }
-            else if (get<1>(rel) == "ex-spouse") {
-                relationType = "бывший(ая) супруг(а)";
-            }
-            else {
-                relationType = get<1>(rel);
-            }
-
-            cout << "- " << get<0>(rel)->getFullName() << " (" << relationType << ")" << endl;
         }
 
-    }
-
-    void printTree() const {
-        std::cout << "=== Генеалогическое древо ===" << std::endl;
-        auto self = const_cast<GenealogicalTree*>(this)->shared_from_this();
-        TreeBuilder builder(self);
-        auto root = builder.buildTree();
-
-        if (!root) {
-            std::cout << "Дерево пустое." << std::endl;
-            return;
+        // Затем выводим супругов (если есть)
+        bool hasSpouses = false;
+        for (const auto& rel : relationships) {
+            if (get<1>(rel) == "spouse") {
+                if (!hasSpouses) {
+                    cout << "Супруги:" << endl;
+                    hasSpouses = true;
+                }
+                cout << "- " << get<0>(rel)->getFullName() << endl;
+            }
         }
 
-        // Лямбда для рекурсивного вывода
-        std::function<void(const std::shared_ptr<TreeNode>&, int, std::vector<bool>)> printNode =
-            [&](const std::shared_ptr<TreeNode>& node, int level, std::vector<bool> lastFlags) {
-            // Вывод префикса
-            for (int i = 0; i < level - 1; ++i) {
-                if (i < lastFlags.size() && lastFlags[i]) {
-                    std::cout << "    ";
+        // Затем выводим родителей (если есть)
+        bool hasParents = false;
+        for (const auto& rel : relationships) {
+            if (get<1>(rel) == "child-parent") {
+                if (!hasParents) {
+                    cout << "Родители:" << endl;
+                    hasParents = true;
                 }
-                else {
-                    std::cout << "|   ";
+                cout << "- " << get<0>(rel)->getFullName() << endl;
+            }
+        }
+
+        // Затем выводим братьев и сестер (если есть)
+        bool hasSiblings = false;
+        for (const auto& rel : relationships) {
+            if (get<1>(rel) == "sibling") {
+                if (!hasSiblings) {
+                    cout << "Сиблинги:" << endl;
+                    hasSiblings = true;
+                }
+                cout << "- " << get<0>(rel)->getFullName() << endl;
+            }
+        }
+
+        // Выводим внуков (если есть)
+        bool hasGrandchildren = false;
+        for (const auto& childRel : relationships) {
+            if (get<1>(childRel) == "parent-child") {
+                auto child = get<0>(childRel);
+                auto childRelationships = relationshipSystem->getRelationshipsFor(child);
+                for (const auto& grandchildRel : childRelationships) {
+                    if (get<1>(grandchildRel) == "parent-child") {
+                        if (!hasGrandchildren) {
+                            cout << "Внуки:" << endl;
+                            hasGrandchildren = true;
+                        }
+                        cout << "- " << get<0>(grandchildRel)->getFullName() << endl;
+                    }
                 }
             }
+        }
 
-            if (level > 0) {
-                if (lastFlags.empty() || lastFlags.back()) {
-                    std::cout << "\\--- ";
-                }
-                else {
-                    std::cout << "|--- ";
+        // Выводим дядей и тёть (если есть)
+        bool hasUnclesAunts = false;
+        for (const auto& parentRel : relationships) {
+            if (get<1>(parentRel) == "child-parent") {
+                auto parent = get<0>(parentRel);
+                auto parentRelationships = relationshipSystem->getRelationshipsFor(parent);
+                for (const auto& uncleAuntRel : parentRelationships) {
+                    if (get<1>(uncleAuntRel) == "sibling" && get<0>(uncleAuntRel) != person) {
+                        if (!hasUnclesAunts) {
+                            cout << "Дяди и тёти:" << endl;
+                            hasUnclesAunts = true;
+                        }
+                        cout << "- " << get<0>(uncleAuntRel)->getFullName() << endl;
+                    }
                 }
             }
+        }
 
-            // Вывод узла
-            node->print(0);
-            std::cout << std::endl;
-
-            // Рекурсивный вывод детей
-            auto children = node->getChildren();
-            for (size_t i = 0; i < children.size(); ++i) {
-                auto newFlags = lastFlags;
-                newFlags.push_back(i == children.size() - 1);
-                printNode(children[i], level + 1, newFlags);
+        // Выводим племянников (если есть)
+        bool hasNephews = false;
+        for (const auto& siblingRel : relationships) {
+            if (get<1>(siblingRel) == "sibling") {
+                auto sibling = get<0>(siblingRel);
+                auto siblingRelationships = relationshipSystem->getRelationshipsFor(sibling);
+                for (const auto& nephewRel : siblingRelationships) {
+                    if (get<1>(nephewRel) == "parent-child") {
+                        if (!hasNephews) {
+                            cout << "Племянники:" << endl;
+                            hasNephews = true;
+                        }
+                        cout << "- " << get<0>(nephewRel)->getFullName() << endl;
+                    }
+                }
             }
-            };
+        }
 
-        printNode(root, 0, {});
-    }
+        // Выводим золовок и деверей (братья и сестры супругов) (если есть)
+        bool hasInLawsSiblings = false;
+        for (const auto& spouseRel : relationships) {
+            if (get<1>(spouseRel) == "spouse") {
+                auto spouse = get<0>(spouseRel);
+                auto spouseRelationships = relationshipSystem->getRelationshipsFor(spouse);
+                for (const auto& inLawRel : spouseRelationships) {
+                    if (get<1>(inLawRel) == "sibling") {
+                        if (!hasInLawsSiblings) {
+                            cout << "Братья и сестры супруга:" << endl;
+                            hasInLawsSiblings = true;
+                        }
+                        cout << "- " << get<0>(inLawRel)->getFullName() << endl;
+                    }
+                }
+            }
+        }
+
+        // Выводим племянников со стороны супруга (если есть)
+        bool hasSpouseNephews = false;
+        for (const auto& spouseRel : relationships) {
+            if (get<1>(spouseRel) == "spouse") {
+                auto spouse = get<0>(spouseRel);
+                auto spouseRelationships = relationshipSystem->getRelationshipsFor(spouse);
+                for (const auto& siblingRel : spouseRelationships) {
+                    if (get<1>(siblingRel) == "sibling") {
+                        auto sibling = get<0>(siblingRel);
+                        auto siblingRelationships = relationshipSystem->getRelationshipsFor(sibling);
+                        for (const auto& nephewRel : siblingRelationships) {
+                            if (get<1>(nephewRel) == "parent-child") {
+                                if (!hasSpouseNephews) {
+                                    cout << "Племянники со стороны супруга:" << endl;
+                                    hasSpouseNephews = true;
+                                }
+                                cout << "- " << get<0>(nephewRel)->getFullName() << endl;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Выводим бывших супругов (если есть)
+        bool hasExSpouses = false;
+        for (const auto& rel : relationships) {
+            if (get<1>(rel) == "ex-spouse") {
+                if (!hasExSpouses) {
+                    cout << "Бывшие супруги:" << endl;
+                    hasExSpouses = true;
+                }
+                cout << "- " << get<0>(rel)->getFullName() << endl;
+            }
+        }
+
+        // Родители супруга (свекровь, свекор / тёща, тесть) (если есть)
+        bool hasInLawParents = false;
+        for (const auto& spouseRel : relationships) {
+            if (get<1>(spouseRel) == "spouse") {
+                auto spouse = get<0>(spouseRel);
+                auto spouseRelationships = relationshipSystem->getRelationshipsFor(spouse);
+                for (const auto& inLawParentRel : spouseRelationships) {
+                    if (get<1>(inLawParentRel) == "child-parent") {
+                        if (!hasInLawParents) {
+                            cout << "Родители супруга/супруги (свекровь, свекор / тёща, тесть):" << endl;
+                            hasInLawParents = true;
+                        }
+                        cout << "- " << get<0>(inLawParentRel)->getFullName()
+                            << " (родитель " << spouse->getFullName() << ")" << endl;
+                    }
+                }
+            }
+        }
+
+        // Дедушки и бабушки (родители родителей) (если есть)
+        bool hasGrandParents = false;
+        for (const auto& parentRel : relationships) {
+            if (get<1>(parentRel) == "child-parent") {
+                auto parent = get<0>(parentRel);
+                auto parentRelationships = relationshipSystem->getRelationshipsFor(parent);
+                for (const auto& grandParentRel : parentRelationships) {
+                    if (get<1>(grandParentRel) == "child-parent") {
+                        if (!hasGrandParents) {
+                            cout << "Дедушки и бабушки:" << endl;
+                            hasGrandParents = true;
+                        }
+                        cout << "- " << get<0>(grandParentRel)->getFullName()
+                            << " (родитель " << parent->getFullName() << ")" << endl;
+                    }
+                }
+            }
+        }
+
+        // Прадеды и прабабушки (если есть)
+        bool hasGreatGrandParents = false;
+        for (const auto& parentRel : relationships) {
+            if (get<1>(parentRel) == "child-parent") {
+                auto parent = get<0>(parentRel);
+                auto parentRelationships = relationshipSystem->getRelationshipsFor(parent);
+                for (const auto& grandParentRel : parentRelationships) {
+                    if (get<1>(grandParentRel) == "child-parent") {
+                        auto grandParent = get<0>(grandParentRel);
+                        auto grandParentRelationships = relationshipSystem->getRelationshipsFor(grandParent);
+                        for (const auto& greatGrandRel : grandParentRelationships) {
+                            if (get<1>(greatGrandRel) == "child-parent") {
+                                if (!hasGreatGrandParents) {
+                                    cout << "Прадеды и прабабушки:" << endl;
+                                    hasGreatGrandParents = true;
+                                }
+                                cout << "- " << get<0>(greatGrandRel)->getFullName()
+                                    << " (родитель " << grandParent->getFullName() << ")" << endl;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Прапрадеды и прапрабабушки (если есть)
+        bool hasGreatGreatGrandParents = false;
+        for (const auto& parentRel : relationships) {
+            if (get<1>(parentRel) == "child-parent") {
+                auto parent = get<0>(parentRel);
+                auto parentRelationships = relationshipSystem->getRelationshipsFor(parent);
+                for (const auto& grandParentRel : parentRelationships) {
+                    if (get<1>(grandParentRel) == "child-parent") {
+                        auto grandParent = get<0>(grandParentRel);
+                        auto grandParentRelationships = relationshipSystem->getRelationshipsFor(grandParent);
+                        for (const auto& greatGrandRel : grandParentRelationships) {
+                            if (get<1>(greatGrandRel) == "child-parent") {
+                                auto greatGrand = get<0>(greatGrandRel);
+                                auto greatGrandRelationships = relationshipSystem->getRelationshipsFor(greatGrand);
+                                for (const auto& greatGreatGrandRel : greatGrandRelationships) {
+                                    if (get<1>(greatGreatGrandRel) == "child-parent") {
+                                        if (!hasGreatGreatGrandParents) {
+                                            cout << "Прапрадеды и прапрабабушки:" << endl;
+                                            hasGreatGreatGrandParents = true;
+                                        }
+                                        cout << "- " << get<0>(greatGreatGrandRel)->getFullName()
+                                            << " (родитель " << greatGrand->getFullName() << ")" << endl;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
 };
-
 // Базовый класс семейного события
 class FamilyEvent {
 protected:
@@ -628,25 +627,46 @@ int main() {
     auto tree = make_shared<GenealogicalTree>();
     auto logger = make_shared<LoggerObserver>();
 
-    // 1. Создаем основателей семьи
-    cout << "\n=== Создаем основателей семьи ===" << endl;
-    auto ivan = make_shared<Person>("Иван", "Иванов", "Петрович", "мужской",
-        "Москва, 1950", "Инженер");
-    ivan->addObserver(logger);
-    tree->addFamilyMember(ivan);
+    // 1. Создаем бабушку и дедушку (родителей Ивана)
+    cout << "\n=== Создаем бабушку и дедушку ===" << endl;
+    auto grandfather = make_shared<Person>("Петр", "Иванов", "Сергеевич", "мужской",
+        "Москва, 1925", "Военный");
+    grandfather->addObserver(logger);
+    tree->addFamilyMember(grandfather);
 
+    auto grandmother = make_shared<Person>("Анна", "Иванова", "Михайловна", "женский",
+        "Москва, 1930", "Учитель");
+    grandmother->addObserver(logger);
+    tree->addFamilyMember(grandmother);
+
+    // 2. Регистрируем их брак
+    cout << "\n=== Регистрируем брак бабушки и дедушки ===" << endl;
+    MarriageEvent grandMarriage(tree, grandfather, grandmother);
+    grandMarriage.execute();
+
+    // 3. Рождение отца (Ивана) и его брата (деверь)
+    cout << "\n=== Рождение Ивана и его брата (деверя) ===" << endl;
+    BirthEvent fatherBirth(tree, grandmother, grandfather, "Иван", "Иванов", "Петрович",
+        "мужской", "Москва, 1950", "Инженер");
+    fatherBirth.execute();
+
+    BirthEvent uncleBirth(tree, grandmother, grandfather, "Сергей", "Иванов", "Петрович",
+        "мужской", "Москва, 1952", "Врач");
+    uncleBirth.execute();
+
+    // 4. Иван женится на Марии
+    cout << "\n=== Иван создает свою семью ===" << endl;
+    auto ivan = tree->findPerson("Иванов Иван Петрович");
     auto maria = make_shared<Person>("Мария", "Иванова", "Сергеевна", "женский",
         "Санкт-Петербург, 1952", "Учитель");
     maria->addObserver(logger);
     tree->addFamilyMember(maria);
 
-    // 2. Регистрируем их брак
-    cout << "\n=== Регистрируем брак ===" << endl;
     MarriageEvent marriage(tree, ivan, maria);
     marriage.execute();
 
-    // 3. Рождение детей
-    cout << "\n=== Рождение детей ===" << endl;
+    // 5. Рождение детей Ивана и Марии (один из них будет отцом племянника)
+    cout << "\n=== Рождение детей Ивана и Марии ===" << endl;
     BirthEvent birth1(tree, maria, ivan, "Алексей", "Иванов", "Иванович",
         "мужской", "Москва, 1975", "Программист");
     birth1.execute();
@@ -655,59 +675,43 @@ int main() {
         "женский", "Москва, 1978", "Врач");
     birth2.execute();
 
-    // 4. Алексей женится
-    cout << "\n=== Алексей создает свою семью ===" << endl;
-    auto alexey = tree->findPerson("Иванов Алексей Иванович");
-    auto ekaterina = make_shared<Person>("Екатерина", "Иванова", "Дмитриевна", "женский",
-        "Москва, 1980", "Дизайнер");
-    ekaterina->addObserver(logger);
-    tree->addFamilyMember(ekaterina);
+    // 6. Сергей (деверь - брат мужа) женится на Елене
+    cout << "\n=== Сергей (деверь) создает семью ===" << endl;
+    auto sergey = tree->findPerson("Иванов Сергей Петрович");
+    auto elena = make_shared<Person>("Елена", "Иванова", "Викторовна", "женский",
+        "Москва, 1955", "Бухгалтер");
+    elena->addObserver(logger);
+    tree->addFamilyMember(elena);
 
-    MarriageEvent marriage2(tree, alexey, ekaterina);
-    marriage2.execute();
+    MarriageEvent uncleMarriage(tree, sergey, elena);
+    uncleMarriage.execute();
 
-    // 5. Рождение ребенка у Алексея и Екатерины
-    cout << "\n=== Рождение ребенка у Алексея ===" << endl;
-    BirthEvent birth3(tree, ekaterina, alexey, "Дмитрий", "Иванов", "Алексеевич",
-        "мужской", "Москва, 2005", "Школьник");
-    birth3.execute();
+    // 7. Рождение племянника (сына Сергея)
+    cout << "\n=== Рождение племянника (сына Сергея) ===" << endl;
+    BirthEvent nephewBirth(tree, elena, sergey, "Дмитрий", "Иванов", "Сергеевич",
+        "мужской", "Москва, 1980", "Экономист");
+    nephewBirth.execute();
 
-    // 6. Выводим информацию
+    // 8. Выводим информацию о связях
     cout << "\n=== Информация о семье ===" << endl;
     tree->printAllMembers();
     cout << endl;
 
-    cout << "=== Информация об Иване ===" << endl;
-    tree->printPersonInfo("Иванов Иван Петрович");
-    cout << endl;
-
-    cout << "=== Связи Марии ===" << endl;
+    cout << "=== Связи Марии (должен быть деверь - Сергей) ===" << endl;
     tree->printRelationships("Иванова Мария Сергеевна");
     cout << endl;
 
-    cout << "=== Связи Алексея ===" << endl;
+    cout << "=== Связи Алексея (должны быть дедушка, бабушка и племянник) ===" << endl;
     tree->printRelationships("Иванов Алексей Иванович");
     cout << endl;
 
-    // 7. Регистрируем смерть Ивана
-    cout << "\n=== Регистрируем смерть Ивана ===" << endl;
-    DeathEvent death(tree, ivan, "Сочи, 2020");
-    death.execute();
+    cout << "=== Связи Сергея (должны быть племянники - Алексей и Ольга) ===" << endl;
+    tree->printRelationships("Иванов Сергей Петрович");
+    cout << endl;
 
-    // 8. Выводим обновленную информацию
-    cout << "\n=== Обновленная информация об Иване ===" << endl;
-    tree->printPersonInfo("Иванов Иван Петрович");
+    cout << "=== Связи Дмитрия (должны быть дедушка и бабушка) ===" << endl;
+    tree->printRelationships("Иванов Дмитрий Сергеевич");
+    cout << endl;
 
-    // 9. Развод Алексея и Екатерины
-    cout << "\n=== Развод Алексея и Екатерины ===" << endl;
-    DivorceEvent divorce(tree, alexey, ekaterina);
-    divorce.execute();
-
-    // 10. Проверяем связи после развода
-    cout << "\n=== Связи Алексея после развода ===" << endl;
-    tree->printRelationships("Иванов Алексей Иванович");
-
-    cout << "\n=== Генеалогическое древо ===" << endl;
-    tree->printTree();
     return 0;
 }
