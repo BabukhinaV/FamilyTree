@@ -154,7 +154,7 @@ void addPerson(GenealogicalTree& tree) {
     auto person = std::make_shared<Person>(firstName, lastName, middleName, gender,
         birthPlace, birthDate, occupation, bio);
     tree.addFamilyMember(person);
-    std::cout << "Человек успешно добавлен: " << person->getFullName() << std::endl;
+    std::cout << "Человек успешно добавлен: " << person->getFullName() << std::endl << std::endl;
 }
 
 void removePerson(GenealogicalTree& tree) {
@@ -173,7 +173,7 @@ void removePerson(GenealogicalTree& tree) {
     auto& members = const_cast<std::vector<std::shared_ptr<Person>>&>(tree.getFamilyMembers());
     members.erase(std::remove(members.begin(), members.end(), person), members.end());
 
-    std::cout << "Человек успешно удален: " << person->getFullName() << std::endl;
+    std::cout << "Человек успешно удален: " << person->getFullName() << std::endl << std::endl;
 }
 
 void addRelationship(GenealogicalTree& tree) {
@@ -252,38 +252,100 @@ int main() {
     auto logger = std::make_shared<LoggerObserver>();
 
     tree->loadFromFile("family_data.txt");
-
+    std::cout << "\n\n";
     int choice;
-
+    std::cout << "           # #### ####\n";
+    std::cout << "         ### \/#|### |/####\n";
+    std::cout << "        ##\/#/ \||/##/_/##/_#\n";
+    std::cout << "      ###  \/###|/ \/ # ###\n";
+    std::cout << "    ##_\_#\_\## | #/###_/_####\n";
+    std::cout << "   ## #### # \ #| /  #### ##/##\n";
+    std::cout << "    __#_--###  |{,###---###-~\n";
+    std::cout << "              \ }{\n";
+    std::cout << "               }}{\n";
+    std::cout << "               }}{\n";
+    std::cout << "          ejm  {{}}\n";
+    std::cout << "         , -=-~{ .-^- _\n";
+    std::cout << "               }\n";
+    std::cout << "                {\n";
+    std::cout << "            Древо Жизни\n";
+    std::cout << "Данная программа для создания простейшего\n";
+    std::cout << "      генеалогbческого древа\n";
     do {
         printMenu();
         std::cin >> choice;
         std::cin.ignore();
 
         switch (choice) {
-        case 1: tree->printAllMembers(); break;
+        case 1: tree->printAllMembers(); 
+            std::cout << std::endl;
+            break;
         case 2: {
             auto p = selectPerson(*tree);
             if (p) p->printInfo();
+            std::cout << std::endl;
+
             break;
         }
         case 3: {
             auto p = selectPerson(*tree);
             if (p) tree->printRelationships(p->getFullName());
+            std::cout << std::endl;
+
             break;
         }
-        case 4: tree->printAllRelationships(); break;
-        case 5: addPerson(*tree); tree->saveToFile("family_data.txt"); break;
-        case 6: removePerson(*tree); tree->saveToFile("family_data.txt"); break;
-        case 7: addRelationship(*tree); tree->saveToFile("family_data.txt"); break;
-        case 8: removeRelationship(*tree); tree->saveToFile("family_data.txt"); break;
-        case 9: triggerEvent(tree); tree->saveToFile("family_data.txt"); break;
-        case 10: tree->saveToFile("family_data.txt"); break;
-        case 0: std::cout << "Пока!" << std::endl; break;
+        case 4: 
+            tree->printAllRelationships(); 
+            std::cout << std::endl;
+            break;
+        case 5: addPerson(*tree); 
+            tree->saveToFile("family_data.txt"); 
+            std::cout << std::endl;
+            break;
+        case 6: removePerson(*tree); 
+            tree->saveToFile("family_data.txt"); 
+            std::cout << std::endl;
+            break;
+        case 7: addRelationship(*tree); 
+            tree->saveToFile("family_data.txt"); 
+            std::cout << std::endl;
+            break;
+        case 8: removeRelationship(*tree); 
+            tree->saveToFile("family_data.txt"); 
+            std::cout << std::endl;
+            break;
+        case 9: triggerEvent(tree); 
+            tree->saveToFile("family_data.txt"); 
+            std::cout << std::endl;
+            break;
+        case 10: 
+            tree->saveToFile("family_data.txt"); 
+            std::cout << std::endl;
+            break;
+        case 0:
+            std::cout << std::endl; 
+            break;
         default: std::cout << "Неверный выбор." << std::endl;
         }
 
     } while (choice != 0);
-
+    std::cout << R"(
+                _                       
+                \`*-.                   
+                 )  _`-.                
+                .  : `. .               
+                : _   '  \              
+                ; *` _.   `*-._         
+                `-.-'          `-.      
+                  ;       `       `.    
+                  :.       .        \   
+                  . \  .   :   .-'   .  
+                  '  `+.;  ;  '      :  
+                  :  '  |    ;       ;-.
+                  ; '   : :`-:     _.`* ;
+         [bug] .*' /  .*' ; .*`- +'  `*'
+               `*-*   `*-*  `*-*'       
+    )" << std::endl;
+    std::cout << "          Доброго пути!" << std::endl;
     return 0;
 }
