@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <windows.h>
 #include <unordered_set>
+#include <fstream>
+#include <sstream>
 
 using namespace std;
 
@@ -54,13 +56,16 @@ private:
     string birthPlace;
     string deathPlace;
     string occupation;
+    string birthDate;
+    string biography;
     bool alive;
 
 public:
     Person(string fName, string lName, string mName, string gender,
-        string bPlace, string occupation)
+        string bPlace, string bDate, string occupation, string bio = "")
         : firstName(fName), lastName(lName), middleName(mName), gender(gender),
-        birthPlace(bPlace), deathPlace(""), occupation(occupation), alive(true) {
+        birthPlace(bPlace), birthDate(bDate), occupation(occupation),
+        biography(bio), deathPlace(""), alive(true) {
     }
 
     // Геттеры
@@ -72,6 +77,8 @@ public:
     string getBirthPlace() const { return birthPlace; }
     string getDeathPlace() const { return deathPlace; }
     string getOccupation() const { return occupation; }
+    string getBirthDate() const { return birthDate; }
+    string getBiography() const { return biography; }
     bool isAlive() const { return alive; }
 
     // Сеттеры
@@ -90,7 +97,51 @@ public:
         }
         cout << "Профессия: " << occupation << endl;
         cout << "Статус: " << (alive ? "Жив" : "Умер") << endl;
+        cout << "Дата рождения: " << birthDate << endl;
+        if (!biography.empty())
+            cout << "Биография: " << biography << endl;
     }
+
+    // Методы для сериализации
+    string serialize() const {
+        return firstName + "|" + lastName + "|" + middleName + "|" + gender + "|" +
+            birthPlace + "|" + birthDate + "|" + deathPlace + "|" + occupation + "|" +
+            (alive ? "1" : "0") + "|" + biography;
+    }
+
+
+    static shared_ptr<Person> deserialize(const string& data) {
+        vector<string> fields;
+        stringstream ss(data);
+        string field;
+
+        while (getline(ss, field, '|')) {
+            fields.push_back(field);
+        }
+
+        if (fields.size() < 8) return nullptr;
+
+        auto person = make_shared<Person>(
+            fields[0], // firstName
+            fields[1], // lastName
+            fields[2], // middleName
+            fields[3], // gender
+            fields[4], // birthPlace
+            fields[5], // birthDate
+            fields[7], // occupation
+            fields.size() > 9 ? fields[9] : "" // biography
+        );
+
+        if (!fields[6].empty()) {
+            person->deathPlace = fields[6];
+        }
+        if (fields.size() > 8) {
+            person->alive = fields[8] == "1";
+        }
+
+        return person;
+    }
+
 };
 
 // Реализация методов Observable
@@ -167,6 +218,16 @@ public:
         }
         return result;
     }
+
+    // Получение всех отношений
+    const vector<tuple<shared_ptr<Person>, shared_ptr<Person>, string>>& getAllRelationships() const {
+        return relationships;
+    }
+
+    // Очистка всех отношений
+    void clear() {
+        relationships.clear();
+    }
 };
 
 // Класс генеалогического древа (только хранение и вывод информации)
@@ -188,6 +249,11 @@ public:
         return relationshipSystem;
     }
 
+    // Получение всех членов семьи
+    const vector<shared_ptr<Person>>& getFamilyMembers() const {
+        return familyMembers;
+    }
+
     // Поиск человека по ФИО
     shared_ptr<Person> findPerson(const string& fullName) const {
         for (const auto& person : familyMembers) {
@@ -197,6 +263,23 @@ public:
         }
         return nullptr;
     }
+
+    // Печать всех отношений
+    void printAllRelationships() const {
+        cout << "=== Все связи ===" << endl;
+        auto relationships = relationshipSystem->getAllRelationships();
+        if (relationships.empty()) {
+            cout << "Связей не найдено." << endl;
+            return;
+        }
+        for (const auto& rel : relationships) {
+            cout << get<0>(rel)->getFullName()
+                << " -> "
+                << get<1>(rel)->getFullName()
+                << " (" << get<2>(rel) << ")" << endl;
+        }
+    }
+
 
     // Вывод информации о человеке
     void printPersonInfo(const string& fullName) const {
@@ -212,8 +295,8 @@ public:
     // Вывод всех членов семьи
     void printAllMembers() const {
         cout << "=== Все члены семьи ===" << endl;
-        for (const auto& person : familyMembers) {
-            cout << "- " << person->getFullName() << endl;
+        for (size_t i = 0; i < familyMembers.size(); ++i) {
+            cout << i + 1 << ". " << familyMembers[i]->getFullName() << endl;
         }
     }
 
@@ -482,9 +565,94 @@ public:
                 }
             }
         }
-    };
+    }
+
+    // Сохранение данных в файл
+    void saveToFile(const string& filename) {
+        ofstream outFile(filename);
+        if (!outFile) {
+            cerr << "Не удалось открыть файл для записи: " << filename << endl;
+            return;
+        }
+
+        // Сохраняем людей
+        outFile << "[People]" << endl;
+        for (const auto& person : familyMembers) {
+            outFile << person->serialize() << endl;
+        }
+
+        // Сохраняем отношения
+        outFile << "[Relationships]" << endl;
+        auto relationships = relationshipSystem->getAllRelationships();
+        for (const auto& rel : relationships) {
+            outFile << get<0>(rel)->getFullName() << "|"
+                << get<1>(rel)->getFullName() << "|"
+                << get<2>(rel) << endl;
+        }
+
+        outFile.close();
+        cout << "Данные успешно сохранены в файл: " << filename << endl;
+    }
+
+    // Загрузка данных из файла
+    bool loadFromFile(const string& filename) {
+        ifstream inFile(filename);
+        if (!inFile) {
+            cerr << "Не удалось открыть файл для чтения: " << filename << endl;
+            return false;
+        }
+
+        // Очищаем текущие данные
+        familyMembers.clear();
+        relationshipSystem->clear();
+
+        string line;
+        bool readingPeople = false;
+        bool readingRelationships = false;
+
+        while (getline(inFile, line)) {
+            if (line.empty()) continue;
+
+            if (line == "[People]") {
+                readingPeople = true;
+                readingRelationships = false;
+                continue;
+            }
+            else if (line == "[Relationships]") {
+                readingPeople = false;
+                readingRelationships = true;
+                continue;
+            }
+
+            if (readingPeople) {
+                auto person = Person::deserialize(line);
+                if (person) {
+                    familyMembers.push_back(person);
+                }
+            }
+            else if (readingRelationships) {
+                size_t pos1 = line.find('|');
+                size_t pos2 = line.find('|', pos1 + 1);
+                if (pos1 != string::npos && pos2 != string::npos) {
+                    string person1Name = line.substr(0, pos1);
+                    string person2Name = line.substr(pos1 + 1, pos2 - pos1 - 1);
+                    string relationType = line.substr(pos2 + 1);
+
+                    auto person1 = findPerson(person1Name);
+                    auto person2 = findPerson(person2Name);
+
+                    if (person1 && person2) {
+                        relationshipSystem->addRelationship(person1, person2, relationType);
+                    }
+                }
+            }
+        }
+
+        inFile.close();
+        cout << "Данные успешно загружены из файла: " << filename << endl;
+        return true;
+    }
 };
-// Базовый класс семейного события
 class FamilyEvent {
 protected:
     shared_ptr<GenealogicalTree> tree;
@@ -497,40 +665,23 @@ public:
 
 // Событие рождения
 class BirthEvent : public FamilyEvent {
-private:
-    shared_ptr<Person> mother;
-    shared_ptr<Person> father;
-    shared_ptr<Person> child;
-
+    shared_ptr<Person> mother, father, child;
 public:
     BirthEvent(shared_ptr<GenealogicalTree> tree,
-        shared_ptr<Person> mother,
-        shared_ptr<Person> father,
-        const string& fName, const string& lName, const string& mName,
-        const string& gender, const string& bPlace, const string& occupation)
-        : FamilyEvent(tree), mother(mother), father(father),
-        child(make_shared<Person>(fName, lName, mName, gender, bPlace, occupation)) {
+        shared_ptr<Person> m, shared_ptr<Person> f,
+        const string& fn, const string& ln, const string& mn,
+        const string& g, const string& bPlace, const string& bDate,
+        const string& occ, const string& bio)
+        : FamilyEvent(tree), mother(m), father(f) {
+        child = make_shared<Person>(fn, ln, mn, g, bPlace, bDate, occ, bio);
     }
 
     void execute() override {
-        auto relSystem = tree->getRelationshipSystem();
-
-        // Добавляем ребенка в древо
         tree->addFamilyMember(child);
-
-        // Устанавливаем отношения родитель-ребенок
-        relSystem->addRelationship(mother, child, "parent-child");
-        relSystem->addRelationship(father, child, "parent-child");
-
-        // Добавляем братские отношения с другими детьми
-        auto motherChildren = relSystem->getRelationshipsFor(mother);
-        for (const auto& rel : motherChildren) {
-            if (get<1>(rel) == "parent-child" && get<0>(rel) != child) {
-                relSystem->addRelationship(get<0>(rel), child, "sibling");
-            }
-        }
-
-        cout << "Зарегистрировано рождение: " << child->getFullName() << endl;
+        auto rel = tree->getRelationshipSystem();
+        rel->addRelationship(mother, child, "parent-child");
+        rel->addRelationship(father, child, "parent-child");
+        cout << "Ребёнок добавлен: " << child->getFullName() << endl;
     }
 };
 
@@ -621,97 +772,297 @@ public:
     }
 };
 
+// Функции для работы с консольным интерфейсом
+void printMenu() {
+    cout << "\n=== Меню ===" << endl;
+    cout << "1. Все люди" << endl;
+    cout << "2. Инфо о человеке" << endl;
+    cout << "3. Связи человека" << endl;
+    cout << "4. Все связи" << endl;
+    cout << "5. Добавить человека" << endl;
+    cout << "6. Удалить человека" << endl;
+    cout << "7. Добавить связь вручную" << endl;
+    cout << "8. Удалить связь вручную" << endl;
+    cout << "9. Вызвать событие (рождение, смерть, брак, развод)" << endl;
+    cout << "10. Сохранить в файл" << endl;
+    cout << "0. Выход\nВыберите: ";
+}
+
+
+void printRelationshipTypes() {
+    cout << "Типы связей:" << endl;
+    cout << "1. Родитель-ребенок" << endl;
+    cout << "2. Супруг/супруга" << endl;
+    cout << "3. Брат/сестра" << endl;
+    cout << "4. Бывший супруг/супруга" << endl;
+    cout << "Выберите тип связи: ";
+}
+
+shared_ptr<Person> selectPerson(const GenealogicalTree& tree) {
+    tree.printAllMembers();
+    cout << "Введите номер человека (0 для отмены): ";
+    int choice;
+    cin >> choice;
+    cin.ignore();
+
+    if (choice == 0) return nullptr;
+
+    const auto& members = tree.getFamilyMembers();
+    if (choice > 0 && choice <= static_cast<int>(members.size())) {
+        return members[choice - 1];
+    }
+    return nullptr;
+}
+
+void triggerEvent(shared_ptr<GenealogicalTree> tree) {
+    cout << "\nВыберите событие:\n";
+    cout << "1. Рождение\n2. Смерть\n3. Брак\n4. Развод\nВыбор: ";
+    int ch;
+    cin >> ch;
+    cin.ignore();
+
+    if (ch == 1) {
+        auto mother = selectPerson(*tree);
+        auto father = selectPerson(*tree);
+        if (!mother || !father) return;
+
+        string fn, ln, mn, g, bPlace, bDate, occ, bio;
+        cout << "Имя ребёнка: "; getline(cin, fn);
+        cout << "Фамилия: "; getline(cin, ln);
+        cout << "Отчество: "; getline(cin, mn);
+        cout << "Пол: "; getline(cin, g);
+        cout << "Место рождения: "; getline(cin, bPlace);
+        cout << "Дата рождения: "; getline(cin, bDate);
+        cout << "Профессия: "; getline(cin, occ);
+        cout << "Биография (необязательно): "; getline(cin, bio);
+
+        BirthEvent event(tree, mother, father, fn, ln, mn, g, bPlace, bDate, occ, bio);
+        event.execute();
+    }
+    else if (ch == 2) {
+        auto person = selectPerson(*tree);
+        if (!person) return;
+        string place;
+        cout << "Место смерти: ";
+        getline(cin, place);
+        DeathEvent event(tree, person, place);
+        event.execute();
+    }
+    else if (ch == 3 || ch == 4) {
+        auto p1 = selectPerson(*tree);
+        auto p2 = selectPerson(*tree);
+        if (!p1 || !p2) return;
+        if (ch == 3) {
+            MarriageEvent event(tree, p1, p2);
+            event.execute();
+        }
+        else {
+            DivorceEvent event(tree, p1, p2);
+            event.execute();
+        }
+    }
+}
+
+
+void addPerson(GenealogicalTree& tree) {
+    string firstName, lastName, middleName, gender, birthPlace, birthDate, occupation, bio;
+
+    cout << "Введите имя: ";
+    getline(cin, firstName);
+    cout << "Введите фамилию: ";
+    getline(cin, lastName);
+    cout << "Введите отчество: ";
+    getline(cin, middleName);
+    cout << "Введите пол (мужской/женский): ";
+    getline(cin, gender);
+    cout << "Введите место рождения: ";
+    getline(cin, birthPlace);
+    cout << "Введите дату рождения: ";
+    getline(cin, birthDate);
+    cout << "Введите профессию: ";
+    getline(cin, occupation);
+    cout << "Введите биографию (необязательно): ";
+    getline(cin, bio);
+
+    auto person = make_shared<Person>(firstName, lastName, middleName, gender,
+        birthPlace, birthDate, occupation, bio);
+    tree.addFamilyMember(person);
+    cout << "Человек успешно добавлен: " << person->getFullName() << endl;
+}
+
+
+void removePerson(GenealogicalTree& tree) {
+    auto person = selectPerson(tree);
+    if (!person) return;
+
+    // Удаляем все связи с этим человеком
+    auto relSystem = tree.getRelationshipSystem();
+    auto relationships = relSystem->getAllRelationships();
+
+    for (const auto& rel : relationships) {
+        if (get<0>(rel) == person || get<1>(rel) == person) {
+            relSystem->removeRelationship(get<0>(rel), get<1>(rel), get<2>(rel));
+        }
+    }
+
+    // Удаляем человека из списка
+    auto& members = const_cast<vector<shared_ptr<Person>>&>(tree.getFamilyMembers());
+    members.erase(remove(members.begin(), members.end(), person), members.end());
+
+    cout << "Человек успешно удален: " << person->getFullName() << endl;
+}
+
+void addRelationship(GenealogicalTree& tree) {
+    cout << "Выберите первого человека:" << endl;
+    auto person1 = selectPerson(tree);
+    if (!person1) return;
+
+    cout << "Выберите второго человека:" << endl;
+    auto person2 = selectPerson(tree);
+    if (!person2) return;
+
+    printRelationshipTypes();
+    int choice;
+    cin >> choice;
+    cin.ignore();
+
+    string relationType;
+    switch (choice) {
+    case 1: relationType = "parent-child"; break;
+    case 2: relationType = "spouse"; break;
+    case 3: relationType = "sibling"; break;
+    case 4: relationType = "ex-spouse"; break;
+    default:
+        cout << "Неверный выбор." << endl;
+        return;
+    }
+
+    tree.getRelationshipSystem()->addRelationship(person1, person2, relationType);
+    cout << "Связь успешно добавлена: " << person1->getFullName() << " -> "
+        << person2->getFullName() << " (" << relationType << ")" << endl;
+}
+
+void removeRelationship(GenealogicalTree& tree) {
+    cout << "Выберите первого человека:" << endl;
+    auto person1 = selectPerson(tree);
+    if (!person1) return;
+
+    cout << "Выберите второго человека:" << endl;
+    auto person2 = selectPerson(tree);
+    if (!person2) return;
+
+    // Получаем все связи между этими людьми
+    auto relationships = tree.getRelationshipSystem()->getRelationshipsFor(person1);
+    vector<string> availableRelations;
+
+    for (const auto& rel : relationships) {
+        if (get<0>(rel) == person2) {
+            availableRelations.push_back(get<1>(rel));
+        }
+    }
+
+    if (availableRelations.empty()) {
+        cout << "Между этими людьми нет связей." << endl;
+        return;
+    }
+
+    cout << "Доступные связи:" << endl;
+    for (size_t i = 0; i < availableRelations.size(); ++i) {
+        cout << i + 1 << ". " << availableRelations[i] << endl;
+    }
+    cout << "Выберите связь для удаления: ";
+
+    int choice;
+    cin >> choice;
+    cin.ignore();
+
+    if (choice > 0 && choice <= static_cast<int>(availableRelations.size())) {
+        tree.getRelationshipSystem()->removeRelationship(person1, person2, availableRelations[choice - 1]);
+        cout << "Связь успешно удалена." << endl;
+    }
+    else {
+        cout << "Неверный выбор." << endl;
+    }
+}
+
+void printFamilyTree(const GenealogicalTree& tree, const shared_ptr<Person>& person, int level = 0) {
+    if (!person) return;
+
+    for (int i = 0; i < level; ++i) cout << "  ";
+    cout << "- " << person->getFullName() << endl;
+
+    auto relationships = tree.getRelationshipSystem()->getRelationshipsFor(person);
+    for (const auto& rel : relationships) {
+        if (get<1>(rel) == "parent-child") {
+            printFamilyTree(tree, get<0>(rel), level + 1);
+        }
+    }
+}
+
+void viewFamilyTree(GenealogicalTree& tree) {
+    auto person = selectPerson(tree);
+    if (!person) return;
+
+    cout << "\nГенеалогическое древо для " << person->getFullName() << ":" << endl;
+    printFamilyTree(tree, person);
+}
+
 int main() {
-    SetConsoleOutputCP(1251); // Настраиваем консоль для русского текста
+    SetConsoleOutputCP(1251);
+    SetConsoleCP(1251);
     // Создаем древо и наблюдателя
     auto tree = make_shared<GenealogicalTree>();
     auto logger = make_shared<LoggerObserver>();
 
-    // 1. Создаем бабушку и дедушку (родителей Ивана)
-    cout << "\n=== Создаем бабушку и дедушку ===" << endl;
-    auto grandfather = make_shared<Person>("Петр", "Иванов", "Сергеевич", "мужской",
-        "Москва, 1925", "Военный");
-    grandfather->addObserver(logger);
-    tree->addFamilyMember(grandfather);
+    // Загрузка данных из файла
+    tree->loadFromFile("family_data.txt");
 
-    auto grandmother = make_shared<Person>("Анна", "Иванова", "Михайловна", "женский",
-        "Москва, 1930", "Учитель");
-    grandmother->addObserver(logger);
-    tree->addFamilyMember(grandmother);
+    int choice;
+    do {
+        printMenu();
+        cin >> choice;
+        cin.ignore();
 
-    // 2. Регистрируем их брак
-    cout << "\n=== Регистрируем брак бабушки и дедушки ===" << endl;
-    MarriageEvent grandMarriage(tree, grandfather, grandmother);
-    grandMarriage.execute();
-
-    // 3. Рождение отца (Ивана) и его брата (деверь)
-    cout << "\n=== Рождение Ивана и его брата (деверя) ===" << endl;
-    BirthEvent fatherBirth(tree, grandmother, grandfather, "Иван", "Иванов", "Петрович",
-        "мужской", "Москва, 1950", "Инженер");
-    fatherBirth.execute();
-
-    BirthEvent uncleBirth(tree, grandmother, grandfather, "Сергей", "Иванов", "Петрович",
-        "мужской", "Москва, 1952", "Врач");
-    uncleBirth.execute();
-
-    // 4. Иван женится на Марии
-    cout << "\n=== Иван создает свою семью ===" << endl;
-    auto ivan = tree->findPerson("Иванов Иван Петрович");
-    auto maria = make_shared<Person>("Мария", "Иванова", "Сергеевна", "женский",
-        "Санкт-Петербург, 1952", "Учитель");
-    maria->addObserver(logger);
-    tree->addFamilyMember(maria);
-
-    MarriageEvent marriage(tree, ivan, maria);
-    marriage.execute();
-
-    // 5. Рождение детей Ивана и Марии (один из них будет отцом племянника)
-    cout << "\n=== Рождение детей Ивана и Марии ===" << endl;
-    BirthEvent birth1(tree, maria, ivan, "Алексей", "Иванов", "Иванович",
-        "мужской", "Москва, 1975", "Программист");
-    birth1.execute();
-
-    BirthEvent birth2(tree, maria, ivan, "Ольга", "Иванова", "Ивановна",
-        "женский", "Москва, 1978", "Врач");
-    birth2.execute();
-
-    // 6. Сергей (деверь - брат мужа) женится на Елене
-    cout << "\n=== Сергей (деверь) создает семью ===" << endl;
-    auto sergey = tree->findPerson("Иванов Сергей Петрович");
-    auto elena = make_shared<Person>("Елена", "Иванова", "Викторовна", "женский",
-        "Москва, 1955", "Бухгалтер");
-    elena->addObserver(logger);
-    tree->addFamilyMember(elena);
-
-    MarriageEvent uncleMarriage(tree, sergey, elena);
-    uncleMarriage.execute();
-
-    // 7. Рождение племянника (сына Сергея)
-    cout << "\n=== Рождение племянника (сына Сергея) ===" << endl;
-    BirthEvent nephewBirth(tree, elena, sergey, "Дмитрий", "Иванов", "Сергеевич",
-        "мужской", "Москва, 1980", "Экономист");
-    nephewBirth.execute();
-
-    // 8. Выводим информацию о связях
-    cout << "\n=== Информация о семье ===" << endl;
-    tree->printAllMembers();
-    cout << endl;
-
-    cout << "=== Связи Марии (должен быть деверь - Сергей) ===" << endl;
-    tree->printRelationships("Иванова Мария Сергеевна");
-    cout << endl;
-
-    cout << "=== Связи Алексея (должны быть дедушка, бабушка и племянник) ===" << endl;
-    tree->printRelationships("Иванов Алексей Иванович");
-    cout << endl;
-
-    cout << "=== Связи Сергея (должны быть племянники - Алексей и Ольга) ===" << endl;
-    tree->printRelationships("Иванов Сергей Петрович");
-    cout << endl;
-
-    cout << "=== Связи Дмитрия (должны быть дедушка и бабушка) ===" << endl;
-    tree->printRelationships("Иванов Дмитрий Сергеевич");
-    cout << endl;
+        switch (choice) {
+        case 1: tree->printAllMembers(); break;
+        case 2: {
+            auto p = selectPerson(*tree);
+            if (p) p->printInfo();
+            break;
+        }
+        case 3: {
+            auto p = selectPerson(*tree);
+            if (p) tree->printRelationships(p->getFullName());
+            break;
+        }
+        case 4:
+            tree->printAllRelationships();
+            break;
+        case 5:
+            addPerson(*tree);
+            tree->saveToFile("family_data.txt");
+            break;
+        case 6:
+            removePerson(*tree);
+            tree->saveToFile("family_data.txt");
+            break;
+        case 7:
+            addRelationship(*tree);
+            tree->saveToFile("family_data.txt");
+            break;
+        case 8:
+            removeRelationship(*tree); tree->saveToFile("family_data.txt"); break;
+        case 9:
+            triggerEvent(tree); tree->saveToFile("family_data.txt"); break;
+        case 10:
+            tree->saveToFile("family_data.txt"); break;
+        case 0:
+            cout << "Пока!" << endl;
+            break;
+        default:
+            cout << "Неверный выбор." << endl;
+        }
+    } while (choice != 0);
 
     return 0;
 }
