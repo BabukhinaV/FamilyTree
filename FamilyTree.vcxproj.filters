@@ -66,7 +66,4 @@
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\Concole\family_data.txt" />
-  </ItemGroup>
 </Project>

@@ -17,8 +17,8 @@ bool MenuHandler::isValidGender(const std::string& gender) {
 void MenuHandler::printMenu() {
     std::cout << "\n=== Меню ===\n"
         << "1. Все люди\n"
-        << "2. Генеалогическое древо человеке\n"
-        << "3. Связи человека\n"
+        << "2. Информация о человеке\n"
+        << "3. Генеалогическое дерево\n"
         << "4. Все связи\n"
         << "5. Добавить человека\n"
         << "6. Удалить человека\n"
@@ -62,7 +62,9 @@ void MenuHandler::triggerEvent(std::shared_ptr<GenealogicalTree> tree) {
 
     if (ch == 1) {
         auto mother = selectPerson(*tree);
+        std::cout << "\n";
         auto father = selectPerson(*tree);
+        std::cout << "\n";
         if (!mother || !father) return;
 
         std::string fn, ln, mn, g, bPlace, bDate, occ, bio;
@@ -135,7 +137,7 @@ void MenuHandler::addPerson(GenealogicalTree& tree) {
 void MenuHandler::removePerson(GenealogicalTree& tree) {
     auto person = selectPerson(tree);
     if (!person) return;
-
+    std::cout << "\n";
     auto relSystem = tree.getRelationshipSystem();
     auto relationships = relSystem->getAllRelationships();
     for (const auto& rel : relationships) {
@@ -143,7 +145,7 @@ void MenuHandler::removePerson(GenealogicalTree& tree) {
             relSystem->removeRelationship(std::get<0>(rel), std::get<1>(rel), std::get<2>(rel));
         }
     }
-
+    std::cout << "\n";
     auto& members = const_cast<std::vector<std::shared_ptr<Person>>&>(tree.getFamilyMembers());
     members.erase(std::remove(members.begin(), members.end(), person), members.end());
 
@@ -151,11 +153,6 @@ void MenuHandler::removePerson(GenealogicalTree& tree) {
 }
 
 void MenuHandler::addRelationship(GenealogicalTree& tree) {
-    auto person1 = selectPerson(tree);
-    if (!person1) return;
-
-    auto person2 = selectPerson(tree);
-    if (!person2) return;
 
     printRelationshipTypes();
     int choice;
@@ -170,6 +167,14 @@ void MenuHandler::addRelationship(GenealogicalTree& tree) {
     case 4: relationType = "ex-spouse"; break;
     default: std::cout << "Неверный выбор.\n"; return;
     }
+    std::cout << "\n";
+    auto person1 = selectPerson(tree);
+    if (!person1) return;
+    std::cout << "\n";
+    auto person2 = selectPerson(tree);
+    if (!person2) return;
+    std::cout << "\n";
+    
 
     tree.getRelationshipSystem()->addRelationship(person1, person2, relationType);
     std::cout << "Связь успешно добавлена: " << person1->getFullName() << " -> "
@@ -179,10 +184,10 @@ void MenuHandler::addRelationship(GenealogicalTree& tree) {
 void MenuHandler::removeRelationship(GenealogicalTree& tree) {
     auto person1 = selectPerson(tree);
     if (!person1) return;
-
+    std::cout << "\n";
     auto person2 = selectPerson(tree);
     if (!person2) return;
-
+    std::cout << "\n";
     auto relationships = tree.getRelationshipSystem()->getRelationshipsFor(person1);
     std::vector<std::string> availableRelations;
 
@@ -196,7 +201,7 @@ void MenuHandler::removeRelationship(GenealogicalTree& tree) {
         std::cout << "Между этими людьми нет связей.\n";
         return;
     }
-
+    std::cout << "\n";
     std::cout << "Доступные связи:\n";
     for (size_t i = 0; i < availableRelations.size(); ++i) {
         std::cout << i + 1 << ". " << availableRelations[i] << "\n";
