@@ -50,6 +50,7 @@ int main() {
         }
         case 3: {
             auto p = MenuHandler::selectPerson(*tree);
+            std::cout << std::endl;
             if (p) tree->printRelationships(p->getFullName());
             std::cout << std::endl;
             break;

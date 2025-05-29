@@ -211,7 +211,7 @@ void MenuHandler::removeRelationship(GenealogicalTree& tree) {
     int choice;
     std::cin >> choice;
     std::cin.ignore();
-
+    std::cout << "\n";
     if (choice > 0 && choice <= static_cast<int>(availableRelations.size())) {
         tree.getRelationshipSystem()->removeRelationship(person1, person2, availableRelations[choice - 1]);
         std::cout << "Связь успешно удалена.\n";

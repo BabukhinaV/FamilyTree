@@ -298,6 +298,83 @@ void GenealogicalTree::printRelationships(const std::string& fullName) const {
             }
         }
     }
+    bool hasUnclesAunts = false;
+    std::set<std::string> printedUnclesAunts;
+
+    for (const auto& parentRel : relationships) {
+        if (get<1>(parentRel) == "child-parent") {
+            auto parent = get<0>(parentRel);
+            auto parentRelationships = relationshipSystem->getRelationshipsFor(parent);
+
+            for (const auto& siblingRel : parentRelationships) {
+                if (get<1>(siblingRel) == "sibling") {
+                    auto uncleAunt = get<0>(siblingRel);
+                    std::string name = uncleAunt->getFullName();
+                    if (!printedUnclesAunts.count(name)) {
+                        printedUnclesAunts.insert(name);
+                        if (!hasUnclesAunts) {
+                            std::cout << "Дяди и тёти:" << std::endl;
+                            hasUnclesAunts = true;
+                        }
+                        std::cout << "- " << name << " (сиблинг " << parent->getFullName() << ")" << std::endl;
+                    }
+
+                    // По браку
+                    auto inLawRelationships = relationshipSystem->getRelationshipsFor(uncleAunt);
+                    for (const auto& spouseRel : inLawRelationships) {
+                        if (get<1>(spouseRel) == "spouse") {
+                            auto spouse = get<0>(spouseRel);
+                            std::string spouseName = spouse->getFullName();
+                            if (!printedUnclesAunts.count(spouseName)) {
+                                printedUnclesAunts.insert(spouseName);
+                                if (!hasUnclesAunts) {
+                                    std::cout << "Дяди и тёти:" << std::endl;
+                                    hasUnclesAunts = true;
+                                }
+                                std::cout << "- " << spouseName << " (супруг(а) " << uncleAunt->getFullName() << ")" << std::endl;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    bool hasCousins = false;
+    std::set<std::string> printedCousins;
+
+    for (const auto& parentRel : relationships) {
+        if (get<1>(parentRel) == "child-parent") {
+            auto parent = get<0>(parentRel);
+            auto parentRelationships = relationshipSystem->getRelationshipsFor(parent);
+
+            for (const auto& siblingRel : parentRelationships) {
+                if (get<1>(siblingRel) == "sibling") {
+                    auto uncleAunt = get<0>(siblingRel);
+                    auto uncleAuntRelationships = relationshipSystem->getRelationshipsFor(uncleAunt);
+
+                    for (const auto& cousinRel : uncleAuntRelationships) {
+                        if (get<1>(cousinRel) == "parent-child") {
+                            auto cousin = get<0>(cousinRel);
+                            std::string name = cousin->getFullName();
+
+                            if (printedCousins.count(name)) continue;
+                            printedCousins.insert(name);
+
+                            if (!hasCousins) {
+                                std::cout << "Двоюродные братья и сестры:" << std::endl;
+                                hasCousins = true;
+                            }
+
+                            std::cout << "- " << name << " (ребёнок " << uncleAunt->getFullName() << ")" << std::endl;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
 
 }
 
